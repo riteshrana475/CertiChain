@@ -42,6 +42,9 @@ public class WalletDocument {
     @Column(nullable = false)
     private String status;
 
+    @Column(name = "scan_status", nullable = false)
+    private String scanStatus = "UNSCANNED";
+
     @Column(nullable = false)
     private String description = "";
 
@@ -144,6 +147,14 @@ public class WalletDocument {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public String getScanStatus() {
+        return scanStatus;
+    }
+
+    public void setScanStatus(String scanStatus) {
+        this.scanStatus = scanStatus;
     }
 
     public String getDescription() {

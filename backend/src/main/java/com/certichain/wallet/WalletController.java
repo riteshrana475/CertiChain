@@ -134,7 +134,8 @@ public class WalletController {
                 document.getCredentialNumber(),
                 document.getContentType(),
                 document.getFileSize(),
-                document.getExtractedText());
+                document.getExtractedText(),
+                document.getScanStatus() == null ? "UNSCANNED" : document.getScanStatus());
     }
 
     private ResponseEntity<byte[]> file(UUID id, boolean attachment) {

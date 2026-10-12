@@ -31,6 +31,8 @@ public class ShareService {
     private final WalletObjectStorage storage;
     private final ActivityRecorder activity;
     private final ShareAccessRepository accessEvents;
+    private final MailGateway mail;
+    private final String publicUrl;
 
     public ShareService(
             CurrentUser current,
@@ -41,7 +43,9 @@ public class ShareService {
             StudentRepository students,
             WalletObjectStorage storage,
             ActivityRecorder activity,
-            ShareAccessRepository accessEvents) {
+            ShareAccessRepository accessEvents,
+            MailGateway mail,
+            @org.springframework.beans.factory.annotation.Value("${certichain.public-url:http://localhost:5173}") String publicUrl) {
         this.current = current;
         this.links = links;
         this.items = items;
@@ -51,6 +55,8 @@ public class ShareService {
         this.storage = storage;
         this.activity = activity;
         this.accessEvents = accessEvents;
+        this.mail = mail;
+        this.publicUrl = publicUrl.endsWith("/") ? publicUrl.substring(0, publicUrl.length() - 1) : publicUrl;
     }
 
     public CreatedShare create(CreateShare request) {
@@ -103,7 +109,21 @@ public class ShareService {
             items.save(item);
         }
         activity.audit(user.getEmail(), "SHARE_CREATED", "SHARE", link.getId().toString(), "Scoped share link");
-        activity.notify(user.getId(), "SHARE_CREATED", "Share link created", "A link was created. Email delivery is not configured, so copy it yourself.", "/wallet/shared");
+        boolean emailed = mail.send(
+                request.recipient(),
+                "A CertiChain document share",
+                "Someone shared selected documents with you. This link does not open the rest of their wallet.\n"
+                        + publicUrl + "/shared/" + token
+                        + "\nThe link expires at " + link.getExpiresAt()
+                        + ". If you already downloaded a file, revoking the link later does not delete that copy.");
+        activity.notify(
+                user.getId(),
+                "SHARE_CREATED",
+                "Share link created",
+                emailed
+                        ? "An email with the link was sent to " + request.recipient().trim() + "."
+                        : "The link was created. Email delivery is not configured, so send it yourself.",
+                "/wallet/shared");
         return new CreatedShare(link.getId(), token, link.getExpiresAt().toString(), link.isAllowDownload());
     }
 

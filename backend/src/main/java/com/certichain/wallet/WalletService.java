@@ -36,6 +36,7 @@ public class WalletService {
     private final OcrClient ocr;
     private final AuditEventRepository audits;
     private final NotificationRepository notifications;
+    private final UploadScanner scanner;
 
     public WalletService(
             CurrentUser current,
@@ -48,7 +49,8 @@ public class WalletService {
             ActivityRecorder activity,
             OcrClient ocr,
             AuditEventRepository audits,
-            NotificationRepository notifications) {
+            NotificationRepository notifications,
+            UploadScanner scanner) {
         this.current = current;
         this.documents = documents;
         this.storage = storage;
@@ -60,6 +62,7 @@ public class WalletService {
         this.ocr = ocr;
         this.audits = audits;
         this.notifications = notifications;
+        this.scanner = scanner;
     }
 
     public WalletPage library(String q, String category, String source, String sort, boolean archived, int page, int size) {
@@ -116,6 +119,7 @@ public class WalletService {
         if (title == null || title.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Add a document title.");
         }
+        String scanStatus = scanner.scan(bytes);
         String key = storage.put(bytes, contentType);
         WalletDocument document = new WalletDocument();
         document.setId(UUID.randomUUID());
@@ -128,6 +132,7 @@ public class WalletService {
         document.setFileSize(bytes.length);
         document.setSha256(WalletObjectStorage.sha256(bytes));
         document.setStatus(USER_UPLOADED);
+        document.setScanStatus(scanStatus);
         document.setDescription(blank(description));
         try {
             document.setIssueDate(date(issueDate));
@@ -141,7 +146,7 @@ public class WalletService {
         document.setCreatedAt(Instant.now());
         documents.save(document);
         activity.audit(user.getEmail(), "DOCUMENT_UPLOADED", "DOCUMENT", document.getId().toString(), document.getTitle());
-        activity.notify(user.getId(), "DOCUMENT_UPLOADED", "Document stored", document.getTitle() + " is in your wallet. It is not university-verified.", "/wallet/documents/" + document.getId());
+        activity.notify(user.getId(), "DOCUMENT_UPLOADED", "Document stored", document.getTitle() + " is in your wallet. It is not university-verified." + scanNote(scanStatus), "/wallet/documents/" + document.getId());
         return uploadItem(document);
     }
 
@@ -219,6 +224,7 @@ public class WalletService {
                     certificate.getId(),
                     "",
                     0,
+                    "",
                     ""));
         }
         return items;
@@ -237,7 +243,8 @@ public class WalletService {
                 document.getCredentialNumber(),
                 document.getContentType(),
                 document.getFileSize(),
-                document.getExtractedText());
+                document.getExtractedText(),
+                document.getScanStatus() == null ? "UNSCANNED" : document.getScanStatus());
     }
 
     private String suggestText(byte[] bytes, String contentType) {
@@ -258,6 +265,14 @@ public class WalletService {
             case "NAME" -> Sort.by("title").ascending();
             case "NAME_DESC" -> Sort.by("title").descending();
             default -> Sort.by("createdAt").descending();
+        };
+    }
+
+    private static String scanNote(String scanStatus) {
+        return switch (scanStatus) {
+            case "CLEAN" -> " The malware scanner reported the file clean.";
+            case "SCAN_UNAVAILABLE" -> " The malware scanner did not answer, so the file was not marked clean.";
+            default -> " No malware scanner is configured, so the file was not marked clean.";
         };
     }
 
@@ -284,7 +299,8 @@ public class WalletService {
             String credentialId,
             String contentType,
             long fileSize,
-            String extractedText) {
+            String extractedText,
+            String scanStatus) {
     }
 
     public record Summary(long total, long issued, long pendingRequests, long activeShares) {

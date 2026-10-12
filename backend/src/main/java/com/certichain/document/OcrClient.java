@@ -24,10 +24,14 @@ public class OcrClient {
     }
 
     public String extract(byte[] bytes) {
+        return extract(bytes, "document.png");
+    }
+
+    public String extract(byte[] bytes, String filename) {
         ByteArrayResource resource = new ByteArrayResource(bytes) {
             @Override
             public String getFilename() {
-                return "document.png";
+                return filename;
             }
         };
         LinkedMultiValueMap<String, Object> body = new LinkedMultiValueMap<>();

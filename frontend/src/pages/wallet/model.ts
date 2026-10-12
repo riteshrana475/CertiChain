@@ -23,6 +23,7 @@ export type WalletItem = {
   contentType: string;
   fileSize: number;
   extractedText: string;
+  scanStatus?: string;
 };
 
 export type WalletPage = {

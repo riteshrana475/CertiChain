@@ -12,4 +12,6 @@ public interface ShareLinkRepository extends JpaRepository<ShareLink, UUID> {
     List<ShareLink> findByOwnerIdOrderByCreatedAtDesc(UUID ownerId);
 
     long countByOwnerIdAndRevokedAtIsNullAndExpiresAtAfter(UUID ownerId, java.time.Instant now);
+
+    List<ShareLink> findByRevokedAtIsNullAndExpiresAtBetween(java.time.Instant start, java.time.Instant end);
 }

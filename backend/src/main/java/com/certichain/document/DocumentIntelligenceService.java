@@ -173,7 +173,8 @@ public class DocumentIntelligenceService {
             if ("application/pdf".equals(document.getContentType())) {
                 String text = pdfText(bytes);
                 if (text.isBlank()) {
-                    return new Read("", "PDF_TEXT", "UNREADABLE", "No embedded text was found. A scanned PDF is not treated as verified, and this reader did not OCR it.");
+                    String recognized = ocr.extract(bytes, "document.pdf");
+                    return new Read(recognized, "OCR", "EXTRACTED", "The PDF had little embedded text, so its pages were read as images. This is not a verification.");
                 }
                 return new Read(text, "PDF_TEXT", "EXTRACTED", "Embedded PDF text was read. These values are suggestions until you confirm them.");
             }

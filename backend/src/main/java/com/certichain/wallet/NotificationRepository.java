@@ -9,4 +9,6 @@ public interface NotificationRepository extends JpaRepository<AppNotification, U
     List<AppNotification> findTop30ByRecipientIdOrderByCreatedAtDesc(UUID recipientId);
 
     long countByRecipientIdAndReadAtIsNull(UUID recipientId);
+
+    boolean existsByRecipientIdAndEventTypeAndHref(UUID recipientId, String eventType, String href);
 }

@@ -1,6 +1,8 @@
 package com.certichain.api;
 
 import com.certichain.blockchain.ChainService;
+import com.certichain.crypto.CredentialSigner;
+import com.certichain.crypto.SigningKeyService;
 import com.certichain.security.CurrentUser;
 import com.certichain.user.UserAccount;
 import com.certichain.user.UserAccountRepository;
@@ -24,13 +26,29 @@ public class SettingsController {
     private final CurrentUser current;
     private final UserAccountRepository users;
     private final PasswordEncoder passwordEncoder;
+    private final CredentialSigner signer;
+    private final SigningKeyService signingKeys;
 
     public SettingsController(
-            ChainService chain, CurrentUser current, UserAccountRepository users, PasswordEncoder passwordEncoder) {
+            ChainService chain,
+            CurrentUser current,
+            UserAccountRepository users,
+            PasswordEncoder passwordEncoder,
+            CredentialSigner signer,
+            SigningKeyService signingKeys) {
         this.chain = chain;
         this.current = current;
         this.users = users;
         this.passwordEncoder = passwordEncoder;
+        this.signer = signer;
+        this.signingKeys = signingKeys;
+    }
+
+    @GetMapping("/api/settings/signing")
+    public SigningStatus signing() {
+        current.institution();
+        boolean configured = signer.configured();
+        return new SigningStatus(configured, configured ? signingKeys.publicKeyId() : "");
     }
 
     @GetMapping("/api/settings/chain")
@@ -73,6 +91,9 @@ public class SettingsController {
         user.setInstitutionId(current.institution().getId());
         user.setPasswordHash(passwordEncoder.encode(request.password()));
         return AccountResponse.from(users.save(user));
+    }
+
+    public record SigningStatus(boolean configured, String keyId) {
     }
 
     public record ChainRequest(@NotBlank String rpcUrl, long chainId, String privateKey) {

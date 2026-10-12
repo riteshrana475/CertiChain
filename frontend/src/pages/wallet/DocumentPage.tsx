@@ -82,6 +82,7 @@ export function DocumentPage() {
             <p><span className="text-muted">Added. </span>{item.date.slice(0, 10)}</p>
             {item.credentialId ? <p><span className="text-muted">Number. </span>{item.credentialId}</p> : null}
             <p><span className="text-muted">File. </span>{item.contentType} · {Math.ceil(item.fileSize / 1024)} KB</p>
+            <p><span className="text-muted">Malware scan. </span>{scanLabel(item.scanStatus)}</p>
             {item.extractedText ? (
               <p className="rounded-xl bg-[#eef4f8] p-3 text-xs leading-5 text-muted">
                 Text suggestion from the optional OCR service. This is not a verification result.
@@ -100,4 +101,10 @@ export function DocumentPage() {
       ) : null}
     </div>
   );
+}
+
+function scanLabel(status: string | undefined) {
+  if (status === "CLEAN") return "Scanner reported this file clean.";
+  if (status === "SCAN_UNAVAILABLE") return "A scanner is configured, but it did not answer. This file was not marked clean.";
+  return "No malware scanner is configured. This file was not marked clean.";
 }

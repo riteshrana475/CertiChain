@@ -51,13 +51,19 @@ Student wallet: `student@certichain.local` / `certichain`. That account sees cre
 
 Verifier desk: `recruiter@certichain.local` / `certichain`. It can check a credential ID and open a share link. It cannot list another person's wallet.
 
-Flyway applies `V6__wallet.sql` on API startup. Wallet files go in the existing private MinIO bucket under random `wallet/` keys. Share links store a SHA-256 of the token. Email delivery is not configured. The OCR service at `OCR_URL` is optional; if it is down, image uploads still save and no text suggestion is shown. OCR never marks a document genuine.
+Flyway applies wallet and signing migrations on API startup. Wallet files go in the existing private MinIO bucket under random `wallet/` keys. Share links store a SHA-256 of the token. The OCR service at `OCR_URL` is optional; if it is down, uploads still save and no text suggestion is shown. OCR never marks a document genuine.
 
 A QR code is the public URL `/verify/{credentialId}`. On a laptop that URL is local. Production needs HTTPS.
 
-The public verification page also lists each check separately: issuer record, detached signature, file fingerprint, revocation, expiry, and chain anchor. A missing signature is not treated as a pass. If `CERTICHAIN_SIGNING_PRIVATE_KEY` and `CERTICHAIN_SIGNING_PUBLIC_KEY` are unset, new credentials are not signed and that check is not applicable. Rotating the key does not rewrite old signatures; each credential keeps the public key stored at issuance. Stop using a compromised key and revoke credentials that were signed with it.
+The public verification page also lists each check separately: issuer record, detached signature, file fingerprint, revocation, expiry, and chain anchor. A missing signature is not treated as a pass. If `CERTICHAIN_SIGNING_PRIVATE_KEY` and `CERTICHAIN_SIGNING_PUBLIC_KEY` are both set, those keys are used and are not written into source control. If they are blank, the API creates one Ed25519 key on first start and stores it in the `signing_keys` table. That private key stays in Postgres. It is a local development issuer key, not an external accreditation. Existing issued credentials with a blank signature are signed on startup. The signature is not part of the chain hash, so this does not re-anchor them. Rotating the key does not rewrite old signatures; each credential keeps the public key stored at issuance. Stop using a compromised key and revoke credentials that were signed with it.
 
-PDF text is read in the API. Image OCR stays in the optional Python service at `OCR_URL` (`/extract` and `/analyze`). Neither path marks a document genuine. There is no email sender and no scheduled share-expiry reminder.
+PDF text is read in the API. When a PDF has no embedded text, the API asks the Python service to render pages and OCR them. Image OCR stays in that service at `OCR_URL` (`/extract` and `/analyze`). Rebuild the `ocr` container after changing that service. Neither path marks a document genuine.
+
+Share links that expire within 24 hours create an in-app notice for the owner. The notice does not include the secret token or the document. Email is sent only when `SPRING_MAIL_HOST` is set and the recipient looks like an email address. With that unset, nothing is emailed and the app does not claim that mail was sent.
+
+`CLAMAV_HOST` is optional. When it is empty, uploads are stored as `UNSCANNED` and are not described as clean. When it is set, the API uses ClamAV INSTREAM. An unreachable scanner stores the file as `SCAN_UNAVAILABLE`. A file the scanner rejects is not stored.
+
+Sepolia still needs your own RPC URL and a funded key in Settings or the environment. The local Anvil key is rejected for chain id 11155111. Anchoring on Sepolia is not simulated.
 
 ## Tests
 

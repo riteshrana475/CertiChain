@@ -44,9 +44,13 @@ certichain:
     bucket: ${MINIO_BUCKET:certichain}
   ocr:
     url: ${OCR_URL:http://localhost:8070}
+  public-url: ${PUBLIC_APP_URL:http://localhost:5173}
   signing:
     private-key: ${CERTICHAIN_SIGNING_PRIVATE_KEY:}
     public-key: ${CERTICHAIN_SIGNING_PUBLIC_KEY:}
+  scan:
+    host: ${CLAMAV_HOST:}
+    port: ${CLAMAV_PORT:3310}
 
 springdoc:
   api-docs:
