@@ -16,7 +16,7 @@ export function CertificateSheet({
   const verifyUrl = `${window.location.origin}${verificationPath(certificate.id)}`;
 
   return (
-    <article className="panel bg-[linear-gradient(180deg,#fffdf8,#ffffff_28%)] p-3 sm:p-4">
+    <article className="panel bg-[linear-gradient(180deg,#f8fbfd,#ffffff_28%)] p-3 sm:p-4">
       <div className="border border-brass/45 px-6 py-8 sm:px-10">
       <div className="flex items-start justify-between gap-6 border-b border-line pb-6">
         <div>
@@ -59,7 +59,7 @@ export function CertificateSheet({
       {showQr && certificate.status === "ISSUED" ? (
         <div className="mt-6 flex items-center gap-4 border-t border-line pt-6">
           <div className="rounded-xl bg-white p-2 shadow-sm ring-1 ring-line">
-            <QRCodeSVG value={verifyUrl} size={96} bgColor="#ffffff" fgColor="#121922" />
+            <QRCodeSVG value={verifyUrl} size={96} bgColor="#ffffff" fgColor="#0e1c2f" />
           </div>
           <div>
             <p className="text-sm font-semibold">Scan to verify</p>

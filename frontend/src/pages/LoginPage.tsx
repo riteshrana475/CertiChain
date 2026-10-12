@@ -84,7 +84,7 @@ export function LoginPage() {
               Fill demo account
             </Button>
           </div>
-          <p className="mt-8 rounded-2xl bg-[#f4f7f4] px-4 py-3 text-sm leading-6 text-muted">
+          <p className="mt-8 rounded-2xl bg-[#eef4f8] px-4 py-3 text-sm leading-6 text-muted">
             Demo account
             <br />
             <span className="text-ink">{DEMO_ADMIN.email}</span>

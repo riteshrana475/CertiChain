@@ -3,14 +3,14 @@
 @theme {
   --font-sans: "Figtree", "Segoe UI", sans-serif;
   --font-serif: "Newsreader", Georgia, serif;
-  --color-paper: #f6f1e7;
-  --color-ink: #1b1914;
-  --color-seal: #1f6b4a;
-  --color-navy: #121922;
-  --color-line: #e4d8c4;
-  --color-muted: #6a6156;
-  --color-brass: #a67c42;
-  --shadow-panel: 0 16px 40px rgba(18, 25, 34, 0.07);
+  --color-paper: #eef3f6;
+  --color-ink: #15202b;
+  --color-seal: #1d5c8a;
+  --color-navy: #0e1c2f;
+  --color-line: #d3dee7;
+  --color-muted: #5d6d7c;
+  --color-brass: #c4a265;
+  --shadow-panel: 0 16px 40px rgba(14, 28, 47, 0.08);
 }
 
 html,
@@ -22,19 +22,19 @@ body,
 body {
   margin: 0;
   background:
-    radial-gradient(1100px 480px at 0% -8%, rgba(166, 124, 66, 0.16), transparent 55%),
-    radial-gradient(820px 420px at 100% 0%, rgba(31, 107, 74, 0.1), transparent 48%),
+    radial-gradient(1100px 480px at 0% -8%, rgba(196, 162, 101, 0.18), transparent 55%),
+    radial-gradient(820px 420px at 100% 0%, rgba(29, 92, 138, 0.14), transparent 48%),
     var(--color-paper);
   color: var(--color-ink);
   font-family: var(--font-sans);
 }
 
 ::selection {
-  background: #d7eadf;
+  background: #d4e4f2;
 }
 
 .panel {
-  background: #fffdf9;
+  background: #f8fbfd;
   border: 1px solid var(--color-line);
   border-radius: 18px;
   box-shadow: var(--shadow-panel);
@@ -45,7 +45,7 @@ body {
 }
 
 .data-table tbody tr:hover {
-  background: #fbf7f0;
+  background: #f3f7fb;
 }
 
 :focus-visible {

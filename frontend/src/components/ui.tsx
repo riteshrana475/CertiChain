@@ -44,8 +44,8 @@ export function Button({
   variant?: "primary" | "secondary" | "danger" | "ghost";
 }) {
   const styles = {
-    primary: "bg-seal text-white shadow-sm shadow-seal/30 hover:bg-[#184f37]",
-    secondary: "border border-line bg-white text-ink shadow-sm hover:border-brass/50 hover:bg-[#fffaf3]",
+    primary: "bg-seal text-white shadow-sm shadow-seal/30 hover:bg-[#16486c]",
+    secondary: "border border-line bg-white text-ink shadow-sm hover:border-brass/50 hover:bg-[#f4f8fb]",
     danger: "bg-[#8c2f2f] text-white shadow-sm hover:bg-[#742626]",
     ghost: "text-muted hover:text-ink",
   }[variant];
@@ -90,10 +90,10 @@ export function Field({
 export function StatusPill({ status, label }: { status: string; label?: string }) {
   const tone =
     status === "ISSUED" || status === "VERIFIED"
-      ? "bg-[#e5f2eb] text-seal"
+      ? "bg-[#e4f0f8] text-seal"
       : status === "REVOKED" || status === "HASH_MISMATCH" || status === "NOT_FOUND"
         ? "bg-[#f8e8e4] text-[#8c2f2f]"
-        : "bg-[#efeadd] text-muted";
+        : "bg-[#e7eef3] text-muted";
   return (
     <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold tracking-wide ${tone}`}>
       {label ?? status.replaceAll("_", " ")}
@@ -106,7 +106,7 @@ export function DataTable({ headers, children }: { headers: string[]; children: 
     <div className="panel data-table overflow-x-auto">
       <table className="w-full min-w-[680px] border-collapse text-left text-sm">
         <thead>
-          <tr className="border-b border-line bg-[#fbf7f0] text-[11px] tracking-[0.14em] text-muted uppercase">
+          <tr className="border-b border-line bg-[#f3f7fb] text-[11px] tracking-[0.14em] text-muted uppercase">
             {headers.map((header) => (
               <th key={header} className="px-4 py-3.5 font-semibold">
                 {header}

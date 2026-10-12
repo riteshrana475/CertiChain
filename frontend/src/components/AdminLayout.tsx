@@ -48,7 +48,7 @@ export function AdminLayout() {
               className={({ isActive }) =>
                 `rounded-xl px-3 py-2.5 text-sm transition ${
                   isActive
-                    ? "bg-white/10 text-white shadow-[inset_3px_0_0_#a67c42]"
+                    ? "bg-white/10 text-white shadow-[inset_3px_0_0_#c4a265]"
                     : "text-paper/70 hover:bg-white/5 hover:text-white"
                 }`
               }
