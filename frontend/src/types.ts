@@ -10,7 +10,8 @@ export const DEMO_ADMIN = {
 export type Session = {
   name: string;
   email: string;
-  role: "INSTITUTION_ADMIN";
+  role: "INSTITUTION_ADMIN" | "STUDENT" | "RECRUITER" | "PLATFORM_ADMIN";
+  institutionName: string;
 };
 
 export type Student = {

@@ -58,6 +58,10 @@ public class CertificateStorage {
     }
 
     public byte[] loadOrCreate(CertificateEntity certificate, StudentEntity student) {
+        return loadOrCreate(certificate, student, CanonicalHasher.INSTITUTION);
+    }
+
+    public byte[] loadOrCreate(CertificateEntity certificate, StudentEntity student, String institution) {
         if (certificate.getFileKey() != null && !certificate.getFileKey().isBlank()) {
             try {
                 return client.getObjectAsBytes(GetObjectRequest.builder().bucket(bucket).key(certificate.getFileKey()).build()).asByteArray();
@@ -65,7 +69,7 @@ public class CertificateStorage {
                 log.warn("Stored PDF for {} was not readable: {}", certificate.getId(), exception.getMessage());
             }
         }
-        byte[] pdf = CertificatePdf.render(certificate, student);
+        byte[] pdf = CertificatePdf.render(certificate, student, institution);
         store(certificate, pdf);
         return pdf;
     }

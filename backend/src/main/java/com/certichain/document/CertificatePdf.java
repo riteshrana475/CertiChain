@@ -18,6 +18,10 @@ public final class CertificatePdf {
     }
 
     public static byte[] render(CertificateEntity certificate, StudentEntity student) {
+        return render(certificate, student, CanonicalHasher.INSTITUTION);
+    }
+
+    public static byte[] render(CertificateEntity certificate, StudentEntity student, String institution) {
         try (PDDocument document = new PDDocument(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             PDPage page = new PDPage(PDRectangle.A4);
             document.addPage(page);
@@ -32,7 +36,7 @@ public final class CertificatePdf {
                 content.setFont(title, 28);
                 content.newLineAtOffset(64, 740);
                 content.setLeading(22);
-                content.showText(safe(CanonicalHasher.INSTITUTION));
+                content.showText(safe(institution == null || institution.isBlank() ? CanonicalHasher.INSTITUTION : institution));
                 content.setFont(body, 14);
                 content.newLine();
                 content.newLine();

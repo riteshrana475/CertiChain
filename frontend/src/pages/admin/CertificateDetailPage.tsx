@@ -1,17 +1,24 @@
 import { useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { CertificateSheet } from "../../components/CertificateSheet";
-import { Button, Field, PageHeader, StatusPill, TextArea } from "../../components/ui";
+import { Button, Field, PageHeader, SelectInput, StatusPill, TextArea, TextInput } from "../../components/ui";
 import { chainSummary, verificationPath } from "../../lib/format";
 import { useRecords } from "../../state/records";
 
 export function CertificateDetailPage() {
   const { certificateId = "" } = useParams();
-  const { certificateById, studentById, revokeCertificate, saveCertificate, ready } = useRecords();
+  const { certificateById, studentById, students, revokeCertificate, saveCertificate, ready } = useRecords();
   const certificate = certificateById(certificateId);
   const [reason, setReason] = useState("");
   const [revoking, setRevoking] = useState(false);
   const [issuing, setIssuing] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [studentId, setStudentId] = useState("");
+  const [certificateType, setCertificateType] = useState("");
+  const [degree, setDegree] = useState("");
+  const [department, setDepartment] = useState("");
+  const [issueDate, setIssueDate] = useState("");
+  const [grade, setGrade] = useState("");
   const [error, setError] = useState("");
 
   if (!ready) {
@@ -33,6 +40,39 @@ export function CertificateDetailPage() {
   }
 
   const student = studentById(certificate.studentId);
+
+  function startEdit() {
+    if (!certificate) return;
+    setStudentId(certificate.studentId);
+    setCertificateType(certificate.certificateType);
+    setDegree(certificate.degree);
+    setDepartment(certificate.department);
+    setIssueDate(certificate.issueDate);
+    setGrade(certificate.grade);
+    setEditing(true);
+    setError("");
+  }
+
+  async function saveEdits(event: FormEvent) {
+    event.preventDefault();
+    if (!certificate) return;
+    setError("");
+    try {
+      await saveCertificate({
+        id: certificate.id,
+        studentId,
+        certificateType,
+        degree,
+        department,
+        issueDate,
+        grade,
+        status: certificate.status === "DRAFT" ? "DRAFT" : "ISSUED",
+      });
+      setEditing(false);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The certificate could not be saved.");
+    }
+  }
 
   async function issueDraft() {
     if (!certificate) return;
@@ -112,7 +152,49 @@ export function CertificateDetailPage() {
             ) : null}
           </dl>
           {error ? <p className="text-sm text-[#8c2f2f]">{error}</p> : null}
-          {certificate.status === "DRAFT" ? (
+          {certificate.status !== "REVOKED" && !editing ? (
+            <Button type="button" variant="secondary" onClick={startEdit}>
+              Edit certificate
+            </Button>
+          ) : null}
+          {editing ? (
+            <form onSubmit={saveEdits} className="space-y-3">
+              <Field label="Student">
+                <SelectInput value={studentId} onChange={(event) => setStudentId(event.target.value)} required>
+                  {students.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </SelectInput>
+              </Field>
+              <Field label="Type">
+                <TextInput value={certificateType} onChange={(event) => setCertificateType(event.target.value)} required />
+              </Field>
+              <Field label="Credential">
+                <TextInput value={degree} onChange={(event) => setDegree(event.target.value)} required />
+              </Field>
+              <Field label="Department">
+                <TextInput value={department} onChange={(event) => setDepartment(event.target.value)} required />
+              </Field>
+              <Field label="Issue date">
+                <TextInput type="date" value={issueDate} onChange={(event) => setIssueDate(event.target.value)} required />
+              </Field>
+              <Field label="Grade">
+                <TextInput value={grade} onChange={(event) => setGrade(event.target.value)} required />
+              </Field>
+              <p className="text-xs leading-5 text-muted">
+                Changing the student, credential, date, or grade writes a new fingerprint. A chain that already recorded the old fingerprint will show this certificate as not anchored.
+              </p>
+              <div className="flex gap-3">
+                <Button type="submit">Save changes</Button>
+                <Button type="button" variant="secondary" onClick={() => setEditing(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          ) : null}
+          {certificate.status === "DRAFT" && !editing ? (
             <Button type="button" onClick={issueDraft} disabled={issuing}>
               Issue certificate
             </Button>

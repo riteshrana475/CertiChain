@@ -44,6 +44,9 @@ certichain:
     bucket: ${MINIO_BUCKET:certichain}
   ocr:
     url: ${OCR_URL:http://localhost:8070}
+  signing:
+    private-key: ${CERTICHAIN_SIGNING_PRIVATE_KEY:}
+    public-key: ${CERTICHAIN_SIGNING_PUBLIC_KEY:}
 
 springdoc:
   api-docs:

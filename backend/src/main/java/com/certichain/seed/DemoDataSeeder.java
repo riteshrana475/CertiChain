@@ -4,6 +4,8 @@ import com.certichain.blockchain.ChainService;
 import com.certichain.certificate.CertificateEntity;
 import com.certichain.certificate.CertificateRepository;
 import com.certichain.crypto.CanonicalHasher;
+import com.certichain.institution.InstitutionEntity;
+import com.certichain.institution.InstitutionRepository;
 import com.certichain.student.StudentEntity;
 import com.certichain.student.StudentRepository;
 import com.certichain.user.UserAccount;
@@ -31,18 +33,21 @@ public class DemoDataSeeder implements ApplicationRunner {
     private final CertificateRepository certificates;
     private final VerificationLogRepository logs;
     private final PasswordEncoder passwordEncoder;
+    private final InstitutionRepository institutions;
 
     public DemoDataSeeder(
             UserAccountRepository users,
             StudentRepository students,
             CertificateRepository certificates,
             VerificationLogRepository logs,
-            PasswordEncoder passwordEncoder) {
+            PasswordEncoder passwordEncoder,
+            InstitutionRepository institutions) {
         this.users = users;
         this.students = students;
         this.certificates = certificates;
         this.logs = logs;
         this.passwordEncoder = passwordEncoder;
+        this.institutions = institutions;
     }
 
     @Override
@@ -54,13 +59,19 @@ public class DemoDataSeeder implements ApplicationRunner {
         if (users.count() > 0) {
             renameLegacyStudentNumbers();
             refreshFingerprints();
-            return;
+        } else {
+            seedDemo();
         }
+        ensureWalletPeople();
+    }
+
+    private void seedDemo() {
         UserAccount admin = new UserAccount();
         admin.setId(UUID.randomUUID());
         admin.setEmail("admin@certichain.local");
         admin.setFullName("Institution Admin");
         admin.setRole("INSTITUTION_ADMIN");
+        admin.setInstitutionId(certichain().getId());
         admin.setPasswordHash(passwordEncoder.encode("certichain"));
         users.save(admin);
 
@@ -78,6 +89,30 @@ public class DemoDataSeeder implements ApplicationRunner {
         log("CERT-2026-001245", "VERIFIED", Instant.parse("2026-10-02T08:40:00Z"));
         log("CERT-2026-001188", "VERIFIED", Instant.parse("2026-10-02T11:15:00Z"));
         log("CERT-2026-000902", "REVOKED", Instant.parse("2026-10-03T04:05:00Z"));
+    }
+
+    private void ensureWalletPeople() {
+        students.findById("stu-vanshika").ifPresent(student -> {
+            if (student.getEmail() == null || student.getEmail().isBlank()) {
+                student.setEmail("student@certichain.local");
+                students.save(student);
+            }
+        });
+        ensureUser("student@certichain.local", "Vanshika Nimwal", "STUDENT");
+        ensureUser("recruiter@certichain.local", "Campus Recruiter", "RECRUITER");
+    }
+
+    private void ensureUser(String email, String name, String role) {
+        if (users.findByEmailIgnoreCase(email).isPresent()) {
+            return;
+        }
+        UserAccount user = new UserAccount();
+        user.setId(UUID.randomUUID());
+        user.setEmail(email);
+        user.setFullName(name);
+        user.setRole(role);
+        user.setPasswordHash(passwordEncoder.encode("certichain"));
+        users.save(user);
     }
 
     private void renameLegacyStudentNumbers() {
@@ -106,7 +141,8 @@ public class DemoDataSeeder implements ApplicationRunner {
                     student.getName(),
                     certificate.getDegree(),
                     certificate.getIssueDate().toString(),
-                    certificate.getGrade()));
+                    certificate.getGrade(),
+                    institutionName(student)));
             if (next.equals(certificate.getDocumentHash())) {
                 continue;
             }
@@ -120,9 +156,26 @@ public class DemoDataSeeder implements ApplicationRunner {
         }
     }
 
+    private InstitutionEntity certichain() {
+        return institutions.findByNameIgnoreCase("CertiChain").orElseGet(() -> {
+            InstitutionEntity created = new InstitutionEntity();
+            created.setId(UUID.fromString("00000000-0000-0000-0000-000000000001"));
+            created.setName("CertiChain");
+            return institutions.save(created);
+        });
+    }
+
+    private String institutionName(StudentEntity student) {
+        if (student.getInstitutionId() == null) {
+            return CanonicalHasher.INSTITUTION;
+        }
+        return institutions.findById(student.getInstitutionId()).map(InstitutionEntity::getName).orElse(CanonicalHasher.INSTITUTION);
+    }
+
     private StudentEntity student(String id, String name, String number, String department, String course, int year) {
         StudentEntity student = new StudentEntity();
         student.setId(id);
+        student.setInstitutionId(certichain().getId());
         student.setName(name);
         student.setStudentNumber(number);
         student.setDepartment(department);

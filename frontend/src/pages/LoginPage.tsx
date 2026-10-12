@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Button, Field, LogoMark, TextInput } from "../components/ui";
 import { useRecords } from "../state/records";
 import { DEMO_ADMIN } from "../types";
@@ -47,8 +47,8 @@ export function LoginPage() {
             <span className="mt-2 block font-serif text-[0.92em] text-brass italic">Verify it anywhere.</span>
           </h1>
           <p className="mt-6 max-w-md text-sm leading-7 text-paper/75">
-            Register students, issue credentials, and publish a public verification page. The records in
-            this demo are synthetic.
+            Institutions issue credentials. Students keep them in a wallet. Anyone can open a verification link.
+            The records in this demo are synthetic.
           </p>
         </div>
         <p className="relative mt-12 text-xs tracking-[0.16em] text-paper/45 uppercase">Institution console</p>
@@ -56,7 +56,7 @@ export function LoginPage() {
       <section className="flex items-center px-6 py-12 sm:px-12">
         <form onSubmit={submit} className="panel mx-auto w-full max-w-md px-7 py-8">
           <h2 className="font-serif text-4xl">Sign in</h2>
-          <p className="mt-2 text-sm text-muted">Sign in to the institution console.</p>
+          <p className="mt-2 text-sm text-muted">Use an institution, student, or verifier account.</p>
           <div className="mt-8 space-y-4">
             <Field label="Email">
               <TextInput
@@ -84,12 +84,22 @@ export function LoginPage() {
               Fill demo account
             </Button>
           </div>
+          <p className="mt-6 text-sm text-muted">
+            New institution?{" "}
+            <Link to="/signup" className="font-medium text-seal">
+              Create one
+            </Link>
+          </p>
           <p className="mt-8 rounded-2xl bg-[#eef4f8] px-4 py-3 text-sm leading-6 text-muted">
             Demo account
             <br />
-            <span className="text-ink">{DEMO_ADMIN.email}</span>
+            <span className="text-ink">{DEMO_ADMIN.email}</span> / certichain — institution
             <br />
-            <span className="text-ink">{DEMO_ADMIN.password}</span>
+            <button type="button" className="text-seal" onClick={() => { setEmail("student@certichain.local"); setPassword("certichain"); }}>student@certichain.local</button>
+            {" "}/ certichain — student wallet
+            <br />
+            <button type="button" className="text-seal" onClick={() => { setEmail("recruiter@certichain.local"); setPassword("certichain"); }}>recruiter@certichain.local</button>
+            {" "}/ certichain — verifier
           </p>
         </form>
       </section>

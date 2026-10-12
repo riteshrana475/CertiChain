@@ -33,6 +33,7 @@ type FieldScan = {
 export function VerifyPage() {
   const { certificateId = "" } = useParams();
   const [record, setRecord] = useState<PublicRecord | null>(null);
+  const [checks, setChecks] = useState<Array<{ name: string; status: string; explanation: string }>>([]);
   const [loadError, setLoadError] = useState("");
   const [fileName, setFileName] = useState("");
   const [fileHash, setFileHash] = useState("");
@@ -61,6 +62,14 @@ export function VerifyPage() {
       })
       .catch((caught: unknown) => {
         if (!cancelled) setLoadError(caught instanceof Error ? caught.message : "Verification failed.");
+      });
+    fetch(`${API_BASE}/api/public/verify/${certificateId}/report`)
+      .then(async (response) => (response.ok ? response.json() : null))
+      .then((next: { checks?: Array<{ name: string; status: string; explanation: string }> } | null) => {
+        if (!cancelled) setChecks(next?.checks ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setChecks([]);
       });
     return () => {
       cancelled = true;
@@ -186,6 +195,16 @@ export function VerifyPage() {
             <p className="mt-3 text-sm text-muted">
               {chainSummary(record.chainStatus, record.chainTxHash, record.chainNetwork)}
             </p>
+            {checks.length > 0 ? (
+              <ul className="mt-6 space-y-3 border-t border-line pt-6">
+                {checks.map((check) => (
+                  <li key={check.name} className="text-sm">
+                    <p className="font-medium">{check.name} · {check.status}</p>
+                    <p className="mt-1 text-muted">{check.explanation}</p>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
             {publicResult === "REVOKED" ? (
               <p className="mt-4 text-sm text-[#8c2f2f]">Reason: {record.revokedReason}</p>
             ) : null}
@@ -229,6 +248,7 @@ export function VerifyPage() {
         )}
         </section>
         <p className="mt-6 text-xs leading-5 text-muted">
+          A QR code opens this page for one credential. The code itself is not proof; the status comes from the issuer record.
           These records are synthetic. They are not official academic credentials.
         </p>
       </main>

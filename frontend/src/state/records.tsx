@@ -28,6 +28,7 @@ type LoginResponse = {
   name: string;
   email: string;
   role: Session["role"];
+  institutionName: string;
 };
 
 type RecordsContextValue = {
@@ -38,6 +39,8 @@ type RecordsContextValue = {
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   addStudent: (input: Omit<Student, "id">) => Promise<Student>;
+  updateStudent: (id: string, input: Omit<Student, "id">) => Promise<Student>;
+  deleteStudent: (id: string) => Promise<void>;
   saveCertificate: (input: CertificateInput) => Promise<Certificate>;
   revokeCertificate: (id: string, reason: string) => Promise<void>;
   resetDemo: () => Promise<void>;
@@ -67,14 +70,37 @@ export function RecordsProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     try {
-      const [nextStudents, nextCertificates, nextLogs] = await Promise.all([
-        api<Student[]>("/api/students"),
-        api<Certificate[]>("/api/certificates"),
-        api<VerificationLog[]>("/api/verification-logs"),
-      ]);
-      setStudents(nextStudents);
-      setCertificates(nextCertificates);
-      setLogs(nextLogs);
+      const me = await api<LoginResponse>("/api/auth/me");
+      const nextSession = {
+        name: me.name,
+        email: me.email,
+        role: me.role,
+        institutionName: me.institutionName,
+      };
+      localStorage.setItem(SESSION_KEY, JSON.stringify(nextSession));
+      setSession((current) =>
+        current &&
+        current.email === nextSession.email &&
+        current.role === nextSession.role &&
+        current.name === nextSession.name &&
+        current.institutionName === nextSession.institutionName
+          ? current
+          : nextSession,
+      );
+      if (me.role === "INSTITUTION_ADMIN" || me.role === "PLATFORM_ADMIN") {
+        const [nextStudents, nextCertificates, nextLogs] = await Promise.all([
+          api<Student[]>("/api/students"),
+          api<Certificate[]>("/api/certificates"),
+          api<VerificationLog[]>("/api/verification-logs"),
+        ]);
+        setStudents(nextStudents);
+        setCertificates(nextCertificates);
+        setLogs(nextLogs);
+      } else {
+        setStudents([]);
+        setCertificates([]);
+        setLogs([]);
+      }
     } finally {
       setReady(true);
     }
@@ -96,7 +122,12 @@ export function RecordsProvider({ children }: { children: ReactNode }) {
       false,
     );
     if (!response.token) throw new Error("The API did not return a sign-in token.");
-    const nextSession = { name: response.name, email: response.email, role: response.role };
+    const nextSession = {
+      name: response.name,
+      email: response.email,
+      role: response.role,
+      institutionName: response.institutionName,
+    };
     setToken(response.token);
     localStorage.setItem(SESSION_KEY, JSON.stringify(nextSession));
     localStorage.removeItem("certichain.records.v1");
@@ -116,6 +147,17 @@ export function RecordsProvider({ children }: { children: ReactNode }) {
     const student = await api<Student>("/api/students", { method: "POST", body: JSON.stringify(input) });
     setStudents((current) => [student, ...current]);
     return student;
+  }, []);
+
+  const updateStudent = useCallback(async (id: string, input: Omit<Student, "id">) => {
+    const student = await api<Student>(`/api/students/${id}`, { method: "PUT", body: JSON.stringify(input) });
+    await refresh();
+    return student;
+  }, [refresh]);
+
+  const deleteStudent = useCallback(async (id: string) => {
+    await api<void>(`/api/students/${id}`, { method: "DELETE" });
+    setStudents((current) => current.filter((item) => item.id !== id));
   }, []);
 
   const saveCertificate = useCallback(async (input: CertificateInput) => {
@@ -144,6 +186,8 @@ export function RecordsProvider({ children }: { children: ReactNode }) {
       login,
       logout,
       addStudent,
+      updateStudent,
+      deleteStudent,
       saveCertificate,
       revokeCertificate,
       resetDemo: refresh,
@@ -151,7 +195,7 @@ export function RecordsProvider({ children }: { children: ReactNode }) {
       studentById: (id) => students.find((item) => item.id === id),
       certificateById: (id) => certificates.find((item) => item.id === id),
     }),
-    [students, certificates, logs, session, login, logout, addStudent, saveCertificate, revokeCertificate, refresh, ready],
+    [students, certificates, logs, session, login, logout, addStudent, updateStudent, deleteStudent, saveCertificate, revokeCertificate, refresh, ready],
   );
 
   return <RecordsContext.Provider value={value}>{children}</RecordsContext.Provider>;

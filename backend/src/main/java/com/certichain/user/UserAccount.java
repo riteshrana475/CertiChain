@@ -25,6 +25,9 @@ public class UserAccount {
     @Column(nullable = false)
     private String role;
 
+    @Column(name = "institution_id")
+    private UUID institutionId;
+
     public UUID getId() {
         return id;
     }
@@ -63,5 +66,13 @@ public class UserAccount {
 
     public void setRole(String role) {
         this.role = role;
+    }
+
+    public UUID getInstitutionId() {
+        return institutionId;
+    }
+
+    public void setInstitutionId(UUID institutionId) {
+        this.institutionId = institutionId;
     }
 }

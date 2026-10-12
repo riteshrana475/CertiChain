@@ -3,8 +3,10 @@ package com.certichain.seed;
 import com.certichain.blockchain.ChainService;
 import com.certichain.certificate.CertificateEntity;
 import com.certichain.certificate.CertificateRepository;
+import com.certichain.crypto.CanonicalHasher;
 import com.certichain.document.CertificatePdf;
 import com.certichain.document.CertificateStorage;
+import com.certichain.institution.InstitutionRepository;
 import com.certichain.student.StudentRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,16 +25,19 @@ public class IssuedRecordPublisher implements ApplicationRunner {
     private final StudentRepository students;
     private final CertificateStorage storage;
     private final ChainService chain;
+    private final InstitutionRepository institutions;
 
     public IssuedRecordPublisher(
             CertificateRepository certificates,
             StudentRepository students,
             CertificateStorage storage,
-            ChainService chain) {
+            ChainService chain,
+            InstitutionRepository institutions) {
         this.certificates = certificates;
         this.students = students;
         this.storage = storage;
         this.chain = chain;
+        this.institutions = institutions;
     }
 
     @Override
@@ -47,7 +52,12 @@ public class IssuedRecordPublisher implements ApplicationRunner {
             }
             boolean changed = false;
             if (certificate.getFileKey() == null || certificate.getFileKey().isBlank()) {
-                changed = storage.store(certificate, CertificatePdf.render(certificate, student));
+                String institution = student.getInstitutionId() == null
+                        ? CanonicalHasher.INSTITUTION
+                        : institutions.findById(student.getInstitutionId())
+                                .map(item -> item.getName())
+                                .orElse(CanonicalHasher.INSTITUTION);
+                changed = storage.store(certificate, CertificatePdf.render(certificate, student, institution));
             }
             changed = chain.sync(certificate) || changed;
             if (changed) {

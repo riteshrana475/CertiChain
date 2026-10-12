@@ -1,6 +1,7 @@
 package com.certichain.blockchain;
 
 import com.certichain.certificate.CertificateEntity;
+import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
@@ -40,11 +41,15 @@ public class ChainService {
 
     private static final Logger log = LoggerFactory.getLogger(ChainService.class);
     private static final long SEPOLIA_CHAIN_ID = 11155111L;
+    private static final long LOCAL_CHAIN_ID = 31337L;
+    private static final String ANVIL_DEVELOPMENT_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
 
     private final ChainDeploymentRepository deployments;
-    private final String rpcUrl;
-    private final long chainId;
-    private final String privateKey;
+    private final ChainSettingsRepository settings;
+    private final String defaultPrivateKey;
+    private String rpcUrl;
+    private long chainId;
+    private String privateKey;
 
     private Web3j web3;
     private RawTransactionManager transactions;
@@ -53,13 +58,96 @@ public class ChainService {
 
     public ChainService(
             ChainDeploymentRepository deployments,
+            ChainSettingsRepository settings,
             @Value("${certichain.chain.rpc-url}") String rpcUrl,
             @Value("${certichain.chain.chain-id}") long chainId,
             @Value("${certichain.chain.private-key:}") String privateKey) {
         this.deployments = deployments;
+        this.settings = settings;
+        this.defaultPrivateKey = privateKey;
         this.rpcUrl = rpcUrl;
         this.chainId = chainId;
         this.privateKey = privateKey;
+    }
+
+    @PostConstruct
+    void loadSavedSettings() {
+        settings.findById(1).ifPresent(saved -> applySaved(saved.getRpcUrl(), saved.getChainId(), saved.getPrivateKey()));
+    }
+
+    public ChainView view() {
+        boolean keyConfigured = chainId != SEPOLIA_CHAIN_ID || storedSepoliaKey();
+        return new ChainView(rpcUrl, chainId, networkName(), keyConfigured);
+    }
+
+    public ChainView configure(String rpcUrl, long chainId, String submittedKey) {
+        if (chainId != LOCAL_CHAIN_ID && chainId != SEPOLIA_CHAIN_ID) {
+            throw new IllegalArgumentException("Choose the local chain or Sepolia.");
+        }
+        String endpoint = rpcUrl == null ? "" : rpcUrl.trim();
+        if (!endpoint.startsWith("http://") && !endpoint.startsWith("https://")) {
+            throw new IllegalArgumentException("The RPC URL must start with http:// or https://.");
+        }
+        String nextKey = resolveKey(chainId, submittedKey);
+        String storedKey = chainId == SEPOLIA_CHAIN_ID ? nextKey : "";
+        ChainSettingsEntity saved = settings.findById(1).orElseGet(ChainSettingsEntity::new);
+        saved.setId(1);
+        saved.setRpcUrl(endpoint);
+        saved.setChainId(chainId);
+        saved.setPrivateKey(storedKey);
+        settings.save(saved);
+        synchronized (this) {
+            applySaved(endpoint, chainId, storedKey);
+            web3 = null;
+            transactions = null;
+            credentials = null;
+            contractAddress = null;
+        }
+        return view();
+    }
+
+    private void applySaved(String rpcUrl, long chainId, String storedKey) {
+        this.rpcUrl = rpcUrl;
+        this.chainId = chainId;
+        if (storedKey != null && !storedKey.isBlank()) {
+            this.privateKey = storedKey;
+        } else if (chainId != SEPOLIA_CHAIN_ID) {
+            this.privateKey = defaultPrivateKey;
+        }
+    }
+
+    private boolean storedSepoliaKey() {
+        return settings.findById(1)
+                .map(saved -> saved.getChainId() == SEPOLIA_CHAIN_ID && saved.getPrivateKey() != null && !saved.getPrivateKey().isBlank())
+                .orElse(false);
+    }
+
+    private String resolveKey(long chainId, String submittedKey) {
+        String submitted = submittedKey == null ? "" : submittedKey.trim();
+        if (chainId == SEPOLIA_CHAIN_ID) {
+            String key = submitted.isBlank() ? storedKey() : submitted;
+            if (key.isBlank()) {
+                throw new IllegalArgumentException("Sepolia needs your own wallet key. The local development key cannot be used.");
+            }
+            if (isAnvilKey(key)) {
+                throw new IllegalArgumentException("The local development key cannot be used on Sepolia.");
+            }
+            return key.startsWith("0x") || key.startsWith("0X") ? key : "0x" + key;
+        }
+        return defaultPrivateKey;
+    }
+
+    private String storedKey() {
+        return settings.findById(1).map(ChainSettingsEntity::getPrivateKey).orElse("");
+    }
+
+    private static boolean isAnvilKey(String key) {
+        String normalized = key.startsWith("0x") || key.startsWith("0X") ? key.substring(2) : key;
+        String known = ANVIL_DEVELOPMENT_KEY.substring(2);
+        return normalized.equalsIgnoreCase(known);
+    }
+
+    public record ChainView(String rpcUrl, long chainId, String network, boolean keyConfigured) {
     }
 
     public String networkName() {
@@ -207,6 +295,36 @@ public class ChainService {
                 BigInteger.ZERO).getTransactionHash();
         waitFor(txHash);
         return txHash;
+    }
+
+    public AnchorInspection inspect(String txHash, String network) {
+        String safeNetwork = network == null ? "" : network;
+        String explorer = "sepolia".equals(safeNetwork) && txHash != null && txHash.startsWith("0x")
+                ? "https://sepolia.etherscan.io/tx/" + txHash
+                : "";
+        if (txHash == null || !txHash.startsWith("0x")) {
+            return new AnchorInspection("NOT_SUBMITTED", "", safeNetwork, null, "");
+        }
+        try {
+            if (web3 == null && !connect()) {
+                return new AnchorInspection("UNAVAILABLE", txHash, safeNetwork, null, explorer);
+            }
+            var receipt = web3.ethGetTransactionReceipt(txHash).send().getTransactionReceipt().orElse(null);
+            if (receipt == null) {
+                return new AnchorInspection("PENDING", txHash, safeNetwork, null, explorer);
+            }
+            Long block = receipt.getBlockNumber() == null ? null : receipt.getBlockNumber().longValue();
+            if ("0x0".equals(receipt.getStatus())) {
+                return new AnchorInspection("FAILED", txHash, safeNetwork, block, explorer);
+            }
+            return new AnchorInspection("CONFIRMED", txHash, safeNetwork, block, explorer);
+        } catch (Exception exception) {
+            log.warn("Anchor status could not be read: {}", exception.getMessage());
+            return new AnchorInspection("UNAVAILABLE", txHash, safeNetwork, null, explorer);
+        }
+    }
+
+    public record AnchorInspection(String state, String txHash, String network, Long blockNumber, String explorerUrl) {
     }
 
     private String findRegisterTx(String certificateId) {

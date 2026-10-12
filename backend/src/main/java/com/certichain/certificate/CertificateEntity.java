@@ -55,6 +55,18 @@ public class CertificateEntity {
     @Column(name = "file_key", nullable = false)
     private String fileKey = "";
 
+    @Column(name = "expiry_date")
+    private LocalDate expiryDate;
+
+    @Column(nullable = false)
+    private String signature = "";
+
+    @Column(name = "signing_key_id", nullable = false)
+    private String signingKeyId = "";
+
+    @Column(name = "signer_public_key", nullable = false)
+    private String signerPublicKey = "";
+
     public String getId() {
         return id;
     }
@@ -173,5 +185,37 @@ public class CertificateEntity {
 
     public void setFileKey(String fileKey) {
         this.fileKey = fileKey;
+    }
+
+    public LocalDate getExpiryDate() {
+        return expiryDate;
+    }
+
+    public void setExpiryDate(LocalDate expiryDate) {
+        this.expiryDate = expiryDate;
+    }
+
+    public String getSignature() {
+        return signature;
+    }
+
+    public void setSignature(String signature) {
+        this.signature = signature;
+    }
+
+    public String getSigningKeyId() {
+        return signingKeyId;
+    }
+
+    public void setSigningKeyId(String signingKeyId) {
+        this.signingKeyId = signingKeyId;
+    }
+
+    public String getSignerPublicKey() {
+        return signerPublicKey;
+    }
+
+    public void setSignerPublicKey(String signerPublicKey) {
+        this.signerPublicKey = signerPublicKey;
     }
 }

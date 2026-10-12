@@ -2,13 +2,41 @@ import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { LogoMark } from "./ui";
 import { useRecords } from "../state/records";
+import type { Session } from "../types";
 
-const links = [
+const issuerLinks = [
   { to: "/dashboard", label: "Dashboard", end: true },
   { to: "/students", label: "Students", end: false },
   { to: "/certificates", label: "Certificates", end: false },
   { to: "/history", label: "Verification log", end: true },
+  { to: "/issuer/bulk", label: "Bulk issuance", end: true },
+  { to: "/issuer/anchors", label: "Anchors", end: true },
+  { to: "/issuer/insights", label: "Insights", end: true },
+  { to: "/issuer/anomalies", label: "Anomalies", end: true },
+  { to: "/settings", label: "Settings", end: true },
 ];
+
+const studentLinks = [
+  { to: "/dashboard", label: "Dashboard", end: true },
+  { to: "/wallet", label: "Wallet", end: true },
+  { to: "/wallet/upload", label: "Add document", end: true },
+  { to: "/wallet/shared", label: "Sharing", end: true },
+  { to: "/wallet/activity", label: "Activity", end: true },
+  { to: "/verify", label: "Verify", end: true },
+  { to: "/settings", label: "Settings", end: true },
+];
+
+const recruiterLinks = [
+  { to: "/dashboard", label: "Verifier desk", end: true },
+  { to: "/verify", label: "Public check", end: true },
+  { to: "/settings", label: "Settings", end: true },
+];
+
+function linksFor(role: Session["role"] | undefined) {
+  if (role === "STUDENT") return studentLinks;
+  if (role === "RECRUITER") return recruiterLinks;
+  return issuerLinks;
+}
 
 export function AdminLayout() {
   const { session, logout, resetDemo } = useRecords();
@@ -35,11 +63,16 @@ export function AdminLayout() {
         <div className="border-b border-white/10 px-5 py-7">
           <div className="flex items-center gap-3">
             <LogoMark />
-            <p className="font-serif text-2xl leading-none">CertiChain</p>
+            <div>
+              <p className="font-serif text-2xl leading-none">CertiChain</p>
+              {session?.institutionName ? (
+                <p className="mt-1 text-[11px] tracking-[0.16em] text-paper/55 uppercase">{session.institutionName}</p>
+              ) : null}
+            </div>
           </div>
         </div>
         <nav className="flex flex-1 flex-col gap-1 px-3 py-5">
-          {links.map((link) => (
+          {linksFor(session?.role).map((link) => (
             <NavLink
               key={link.to}
               to={link.to}

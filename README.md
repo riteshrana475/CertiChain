@@ -47,6 +47,18 @@ npm run dev
 
 Open http://localhost:5173 and sign in with `admin@certichain.local` / `certichain`. A public check such as http://localhost:5173/verify/CERT-2026-001245 can download the issued PDF, confirm that file, or scan a PDF, text record, or image.
 
+Student wallet: `student@certichain.local` / `certichain`. That account sees credentials issued to the student record with the same email. Uploaded files stay "User uploaded — not verified".
+
+Verifier desk: `recruiter@certichain.local` / `certichain`. It can check a credential ID and open a share link. It cannot list another person's wallet.
+
+Flyway applies `V6__wallet.sql` on API startup. Wallet files go in the existing private MinIO bucket under random `wallet/` keys. Share links store a SHA-256 of the token. Email delivery is not configured. The OCR service at `OCR_URL` is optional; if it is down, image uploads still save and no text suggestion is shown. OCR never marks a document genuine.
+
+A QR code is the public URL `/verify/{credentialId}`. On a laptop that URL is local. Production needs HTTPS.
+
+The public verification page also lists each check separately: issuer record, detached signature, file fingerprint, revocation, expiry, and chain anchor. A missing signature is not treated as a pass. If `CERTICHAIN_SIGNING_PRIVATE_KEY` and `CERTICHAIN_SIGNING_PUBLIC_KEY` are unset, new credentials are not signed and that check is not applicable. Rotating the key does not rewrite old signatures; each credential keeps the public key stored at issuance. Stop using a compromised key and revoke credentials that were signed with it.
+
+PDF text is read in the API. Image OCR stays in the optional Python service at `OCR_URL` (`/extract` and `/analyze`). Neither path marks a document genuine. There is no email sender and no scheduled share-expiry reminder.
+
 ## Tests
 
 ```bash

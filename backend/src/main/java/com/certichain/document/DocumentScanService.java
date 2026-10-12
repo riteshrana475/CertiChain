@@ -22,12 +22,17 @@ public class DocumentScanService {
         this.ocr = ocr;
     }
 
-    public ScanOutcome scan(CertificateEntity certificate, StudentEntity student, byte[] fileBytes) {
+    public ScanOutcome scan(CertificateEntity certificate, StudentEntity student, byte[] fileBytes, String institution) {
         Extraction extraction = extract(fileBytes);
-        return new ScanOutcome(extraction.note(), compareText(certificate, student, extraction.text()));
+        return new ScanOutcome(extraction.note(), compareText(certificate, student, extraction.text(), institution));
     }
 
     public static List<FieldComparison> compareText(CertificateEntity certificate, StudentEntity student, String text) {
+        return compareText(certificate, student, text, CanonicalHasher.INSTITUTION);
+    }
+
+    public static List<FieldComparison> compareText(
+            CertificateEntity certificate, StudentEntity student, String text, String institution) {
         String[] pipe = pipeParts(text);
         String foundId = first(labeled(text, "Certificate ID"), pipe, 0);
         String foundName = first(labeled(text, "Student"), pipe, 1);
@@ -38,7 +43,7 @@ public class DocumentScanService {
         if (fingerprint.isBlank() && pipe != null) {
             fingerprint = CanonicalHasher.sha256(Arrays.stream(pipe).map(String::trim).reduce((left, right) -> left + "|" + right).orElse(""));
         }
-        String rebuilt = rebuildFingerprint(foundId, foundName, foundDegree, foundDate, foundGrade);
+        String rebuilt = rebuildFingerprint(foundId, foundName, foundDegree, foundDate, foundGrade, institution);
         if (!certificate.getDocumentHash().equalsIgnoreCase(fingerprint) && certificate.getDocumentHash().equalsIgnoreCase(rebuilt)) {
             fingerprint = rebuilt;
         }
@@ -112,11 +117,11 @@ public class DocumentScanService {
         return null;
     }
 
-    private static String rebuildFingerprint(String id, String name, String degree, String date, String grade) {
+    private static String rebuildFingerprint(String id, String name, String degree, String date, String grade, String institution) {
         if (id.isBlank() || name.isBlank() || degree.isBlank() || date.isBlank() || grade.isBlank()) {
             return "";
         }
-        return CanonicalHasher.sha256(CanonicalHasher.canonical(id, name, degree, date, grade));
+        return CanonicalHasher.sha256(CanonicalHasher.canonical(id, name, degree, date, grade, institution));
     }
 
     private static String first(String labeled, String[] pipe, int index) {

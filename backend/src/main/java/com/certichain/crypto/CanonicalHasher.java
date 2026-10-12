@@ -12,7 +12,13 @@ public final class CanonicalHasher {
     }
 
     public static String canonical(String certificateId, String studentName, String degree, String issueDate, String grade) {
-        return String.join("|", certificateId, studentName, degree, issueDate, grade, INSTITUTION);
+        return canonical(certificateId, studentName, degree, issueDate, grade, INSTITUTION);
+    }
+
+    public static String canonical(
+            String certificateId, String studentName, String degree, String issueDate, String grade, String institution) {
+        String issuer = institution == null || institution.isBlank() ? INSTITUTION : institution;
+        return String.join("|", certificateId, studentName, degree, issueDate, grade, issuer);
     }
 
     public static String sha256(String value) {
