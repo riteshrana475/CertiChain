@@ -1,108 +1,123 @@
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type KeyboardEvent } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
-import { Button, Field, LogoMark, TextInput } from "../components/ui";
+import { Button, Field, TextInput } from "../components/ui";
 import { useRecords } from "../state/records";
-import { DEMO_ADMIN } from "../types";
+import { AuthFrame } from "./AuthFrame";
+
+const REMEMBERED_EMAIL = "certichain.login.email";
+
+const DEMOS = [
+  { label: "Institution", email: "admin@certichain.local", detail: "Issue and revoke" },
+  { label: "Student", email: "student@certichain.local", detail: "Open the wallet" },
+  { label: "Verifier", email: "recruiter@certichain.local", detail: "Check an ID" },
+] as const;
 
 export function LoginPage() {
   const { session, login } = useRecords();
   const navigate = useNavigate();
   const location = useLocation();
   const from = (location.state as { from?: string } | null)?.from ?? "/dashboard";
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(() => localStorage.getItem(REMEMBERED_EMAIL) ?? "");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [remember, setRemember] = useState(() => Boolean(localStorage.getItem(REMEMBERED_EMAIL)));
+  const [capsLock, setCapsLock] = useState(false);
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
   if (session) return <Navigate to="/dashboard" replace />;
 
-  async function submit(event: FormEvent) {
-    event.preventDefault();
+  async function signIn(nextEmail: string, nextPassword: string) {
+    setBusy(true);
+    setError("");
     try {
-      await login(email, password);
+      await login(nextEmail.trim(), nextPassword);
+      if (remember) localStorage.setItem(REMEMBERED_EMAIL, nextEmail.trim());
+      else localStorage.removeItem(REMEMBERED_EMAIL);
       navigate(from, { replace: true });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Sign-in failed.");
+      setBusy(false);
     }
   }
 
-  function useDemoAccount() {
-    setEmail(DEMO_ADMIN.email);
-    setPassword(DEMO_ADMIN.password);
-    setError("");
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    void signIn(email, password);
+  }
+
+  function watchCaps(event: KeyboardEvent<HTMLInputElement>) {
+    setCapsLock(event.getModifierState("CapsLock"));
   }
 
   return (
-    <div className="grid min-h-screen lg:grid-cols-[1.15fr_0.85fr]">
-      <section className="relative flex flex-col justify-between overflow-hidden bg-navy px-8 py-10 text-paper sm:px-14">
-        <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full border border-brass/40" />
-        <div className="pointer-events-none absolute -top-4 -right-4 h-40 w-40 rounded-full border border-white/10" />
-        <div className="pointer-events-none absolute bottom-16 -left-20 h-56 w-56 rounded-full bg-seal/20 blur-3xl" />
-        <div className="relative">
-          <div className="flex items-center gap-4">
-            <LogoMark className="h-24 w-24 sm:h-28 sm:w-28" />
-            <p className="font-serif text-3xl leading-none">CertiChain</p>
-          </div>
-          <h1 className="mt-10 max-w-lg font-serif text-5xl leading-[1.05] sm:text-6xl">
-            Issue a certificate once.
-            <span className="mt-2 block font-serif text-[0.92em] text-brass italic">Verify it anywhere.</span>
-          </h1>
-          <p className="mt-6 max-w-md text-sm leading-7 text-paper/75">
-            Institutions issue credentials. Students keep them in a wallet. Anyone can open a verification link.
-            The records in this demo are synthetic.
-          </p>
-        </div>
-        <p className="relative mt-12 text-xs tracking-[0.16em] text-paper/45 uppercase">Institution console</p>
-      </section>
-      <section className="flex items-center px-6 py-12 sm:px-12">
-        <form onSubmit={submit} className="panel mx-auto w-full max-w-md px-7 py-8">
-          <h2 className="font-serif text-4xl">Sign in</h2>
-          <p className="mt-2 text-sm text-muted">Use an institution, student, or verifier account.</p>
-          <div className="mt-8 space-y-4">
-            <Field label="Email">
+    <AuthFrame>
+      <form onSubmit={submit} className="panel mx-auto w-full max-w-md px-7 py-8">
+        <h2 className="font-serif text-4xl">Sign in</h2>
+        <p className="mt-2 text-sm text-muted">Institution, student, and verifier accounts use the same page.</p>
+        <div className="mt-8 space-y-4">
+          <Field label="Email">
+            <TextInput
+              type="email"
+              autoComplete="username"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+            />
+          </Field>
+          <Field label="Password" hint={capsLock ? "Caps Lock is on." : undefined}>
+            <span className="flex gap-2">
               <TextInput
-                type="email"
-                autoComplete="username"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                required
-              />
-            </Field>
-            <Field label="Password">
-              <TextInput
-                type="password"
+                type={showPassword ? "text" : "password"}
                 autoComplete="current-password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
+                onKeyUp={watchCaps}
                 required
               />
-            </Field>
+              <button
+                type="button"
+                className="shrink-0 rounded-xl border border-line px-3 text-xs font-semibold text-seal"
+                onClick={() => setShowPassword((value) => !value)}
+              >
+                {showPassword ? "Hide" : "Show"}
+              </button>
+            </span>
+          </Field>
+          <label className="flex items-center gap-2 text-sm text-muted">
+            <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
+            Remember this email on this browser
+          </label>
+        </div>
+        {error ? <p className="mt-4 text-sm text-[#8c2f2f]">{error}</p> : null}
+        <div className="mt-6">
+          <Button type="submit" disabled={busy}>{busy ? "Signing in" : "Sign in"}</Button>
+        </div>
+        <div className="mt-8">
+          <p className="text-xs font-semibold tracking-[0.14em] text-muted uppercase">Demo accounts</p>
+          <div className="mt-3 grid gap-2">
+            {DEMOS.map((account) => (
+              <button
+                key={account.email}
+                type="button"
+                disabled={busy}
+                className="flex items-center justify-between rounded-xl border border-line px-3 py-2 text-left text-sm hover:border-seal/40 disabled:opacity-50"
+                onClick={() => void signIn(account.email, "certichain")}
+              >
+                <span>
+                  <span className="font-medium text-ink">{account.label}</span>
+                  <span className="mt-0.5 block text-xs text-muted">{account.email}</span>
+                </span>
+                <span className="text-xs text-seal">{account.detail}</span>
+              </button>
+            ))}
           </div>
-          {error ? <p className="mt-4 text-sm text-[#8c2f2f]">{error}</p> : null}
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Button type="submit">Sign in</Button>
-            <Button type="button" variant="secondary" onClick={useDemoAccount}>
-              Fill demo account
-            </Button>
-          </div>
-          <p className="mt-6 text-sm text-muted">
-            New institution?{" "}
-            <Link to="/signup" className="font-medium text-seal">
-              Create one
-            </Link>
-          </p>
-          <p className="mt-8 rounded-2xl bg-[#eef4f8] px-4 py-3 text-sm leading-6 text-muted">
-            Demo account
-            <br />
-            <span className="text-ink">{DEMO_ADMIN.email}</span> / certichain — institution
-            <br />
-            <button type="button" className="text-seal" onClick={() => { setEmail("student@certichain.local"); setPassword("certichain"); }}>student@certichain.local</button>
-            {" "}/ certichain — student wallet
-            <br />
-            <button type="button" className="text-seal" onClick={() => { setEmail("recruiter@certichain.local"); setPassword("certichain"); }}>recruiter@certichain.local</button>
-            {" "}/ certichain — verifier
-          </p>
-        </form>
-      </section>
-    </div>
+        </div>
+        <p className="mt-6 text-sm text-muted">
+          New here?{" "}
+          <Link to="/signup" className="font-medium text-seal">Create an account</Link>
+        </p>
+      </form>
+    </AuthFrame>
   );
 }
