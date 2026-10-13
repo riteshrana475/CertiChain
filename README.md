@@ -20,7 +20,7 @@ flowchart LR
   api --> ocr
 ```
 
-The admin console and the public verification page use the API. Issuing a certificate writes an SHA-256 fingerprint, stores a PDF in MinIO, and registers that fingerprint in the `CertificateRegistry` contract. By default the contract runs on a local Anvil chain. Set `CHAIN_RPC_URL`, `CHAIN_PRIVATE_KEY`, and `CHAIN_ID=11155111` to anchor on Sepolia instead. Do not commit a funded key. The public Anvil development key in the dev profile must never be funded on a public network.
+The admin console and the public verification page use the API. Issuing a certificate writes an SHA-256 fingerprint, stores a PDF in MinIO, and registers that fingerprint in the `CertificateRegistry` contract. By default the contract runs on a local Anvil chain whose state is stored in a Docker volume, so a restart keeps the same contract and transactions. Set `CHAIN_RPC_URL`, `CHAIN_PRIVATE_KEY`, and `CHAIN_ID=11155111` to anchor on Sepolia instead. Do not commit a funded key. The public Anvil development key in the dev profile must never be funded on a public network.
 
 ## Run the API
 
@@ -55,7 +55,7 @@ Flyway applies wallet and signing migrations on API startup. Wallet files go in 
 
 A QR code is the public URL `/verify/{credentialId}`. On a laptop that URL is local. Production needs HTTPS.
 
-The public verification page also lists each check separately: issuer record, detached signature, file fingerprint, revocation, expiry, and chain anchor. A missing signature is not treated as a pass. If `CERTICHAIN_SIGNING_PRIVATE_KEY` and `CERTICHAIN_SIGNING_PUBLIC_KEY` are both set, those keys are used and are not written into source control. If they are blank, the API creates one Ed25519 key on first start and stores it in the `signing_keys` table. That private key stays in Postgres. It is a local development issuer key, not an external accreditation. Existing issued credentials with a blank signature are signed on startup. The signature is not part of the chain hash, so this does not re-anchor them. Rotating the key does not rewrite old signatures; each credential keeps the public key stored at issuance. Stop using a compromised key and revoke credentials that were signed with it.
+The public verification page also lists each check separately: issuer record, detached signature, file fingerprint, revocation, expiry, and chain anchor. A missing signature is not treated as a pass. If `CERTICHAIN_SIGNING_PRIVATE_KEY` and `CERTICHAIN_SIGNING_PUBLIC_KEY` are both set, those keys are used and are not written into source control. If they are blank, an institution admin supplies the key in Settings. The private key stays on the server so new credentials can be signed, and it is not returned again. Each credential stores only the public key from issuance. A key created automatically by an older demo is not used for new signatures. Existing issued credentials with a blank signature are signed on startup when a key is configured. The signature is not part of the chain hash, so this does not re-anchor them. Rotating the key does not rewrite old signatures; each credential keeps the public key stored at issuance. Stop using a compromised key and revoke credentials that were signed with it.
 
 PDF text is read in the API. When a PDF has no embedded text, the API asks the Python service to render pages and OCR them. Image OCR stays in that service at `OCR_URL` (`/extract` and `/analyze`). Rebuild the `ocr` container after changing that service. Neither path marks a document genuine.
 

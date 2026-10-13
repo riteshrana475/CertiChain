@@ -21,6 +21,9 @@ public class SigningKeyEntity {
     @Column(name = "key_id", nullable = false)
     private String keyId;
 
+    @Column(nullable = false)
+    private boolean supplied;
+
     public int getId() {
         return id;
     }
@@ -51,5 +54,13 @@ public class SigningKeyEntity {
 
     public void setKeyId(String keyId) {
         this.keyId = keyId;
+    }
+
+    public boolean isSupplied() {
+        return supplied;
+    }
+
+    public void setSupplied(boolean supplied) {
+        this.supplied = supplied;
     }
 }

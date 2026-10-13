@@ -306,7 +306,7 @@ public class ChainService {
             return new AnchorInspection("NOT_SUBMITTED", "", safeNetwork, null, "");
         }
         try {
-            if (web3 == null && !connect()) {
+            if ((web3 == null && !connect()) || web3 == null) {
                 return new AnchorInspection("UNAVAILABLE", txHash, safeNetwork, null, explorer);
             }
             var receipt = web3.ethGetTransactionReceipt(txHash).send().getTransactionReceipt().orElse(null);
@@ -319,8 +319,25 @@ public class ChainService {
             }
             return new AnchorInspection("CONFIRMED", txHash, safeNetwork, block, explorer);
         } catch (Exception exception) {
+            web3 = null;
             log.warn("Anchor status could not be read: {}", exception.getMessage());
-            return new AnchorInspection("UNAVAILABLE", txHash, safeNetwork, null, explorer);
+            try {
+                if (!connect()) {
+                    return new AnchorInspection("UNAVAILABLE", txHash, safeNetwork, null, explorer);
+                }
+                var receipt = web3.ethGetTransactionReceipt(txHash).send().getTransactionReceipt().orElse(null);
+                if (receipt == null) {
+                    return new AnchorInspection("PENDING", txHash, safeNetwork, null, explorer);
+                }
+                Long block = receipt.getBlockNumber() == null ? null : receipt.getBlockNumber().longValue();
+                if ("0x0".equals(receipt.getStatus())) {
+                    return new AnchorInspection("FAILED", txHash, safeNetwork, block, explorer);
+                }
+                return new AnchorInspection("CONFIRMED", txHash, safeNetwork, block, explorer);
+            } catch (Exception retry) {
+                web3 = null;
+                return new AnchorInspection("UNAVAILABLE", txHash, safeNetwork, null, explorer);
+            }
         }
     }
 

@@ -21,15 +21,14 @@ export function CertificateSheet({
       <div className="flex items-start justify-between gap-6 border-b border-line pb-6">
         <div>
           <p className="text-xs font-semibold tracking-[0.2em] text-brass uppercase">{INSTITUTION_NAME}</p>
-          <h2 className="mt-3 font-serif text-3xl text-ink">{certificate.certificateType} certificate</h2>
+          <h2 className="mt-3 font-serif text-3xl text-ink">{heading(certificate.certificateType)}</h2>
         </div>
         <LogoMark className="h-16 w-16 shrink-0 sm:h-20 sm:w-20" />
       </div>
       <p className="mt-8 text-sm text-muted">This record certifies that</p>
       <p className="mt-1 font-serif text-4xl leading-tight text-ink">{student?.name ?? "Unknown student"}</p>
       <p className="mt-4 max-w-md text-sm leading-6 text-ink">
-        has completed <span className="font-semibold">{certificate.degree || "—"}</span> in the{" "}
-        {certificate.department || "—"} department.
+        {statement(certificate.certificateType, certificate.degree, certificate.department)}
       </p>
       <dl className="mt-8 grid gap-4 border-t border-line pt-6 text-sm sm:grid-cols-2">
         <div>
@@ -67,7 +66,25 @@ export function CertificateSheet({
           </div>
         </div>
       ) : null}
+      <p className="mt-6 text-xs leading-5 text-muted">The issued PDF carries the institution name, seal, and signatory. The fingerprint stays the credential fields.</p>
       </div>
     </article>
   );
+}
+
+function heading(type: string) {
+  const normalized = type.trim().toLowerCase();
+  if (normalized.includes("transcript")) return "Academic transcript";
+  if (normalized.includes("bonafide")) return "Bonafide certificate";
+  if (normalized.includes("degree")) return "Degree certificate";
+  return `${type || "Credential"} certificate`;
+}
+
+function statement(type: string, degree: string, department: string) {
+  const program = degree || "—";
+  const office = department || "—";
+  const normalized = type.trim().toLowerCase();
+  if (normalized.includes("transcript")) return `has a transcript on record for ${program} in the ${office} department.`;
+  if (normalized.includes("bonafide")) return `is certified as a bonafide student of ${program} in the ${office} department.`;
+  return `has been awarded ${program} in the ${office} department.`;
 }

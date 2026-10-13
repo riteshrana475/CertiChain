@@ -21,6 +21,7 @@ export type Student = {
   department: string;
   course: string;
   graduationYear: number;
+  email?: string;
 };
 
 export type CertificateStatus = "DRAFT" | "ISSUED" | "REVOKED";

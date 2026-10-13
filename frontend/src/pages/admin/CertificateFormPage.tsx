@@ -96,8 +96,8 @@ export function CertificateFormPage() {
           <Field label="Credential type">
             <SelectInput value={certificateType} onChange={(event) => setCertificateType(event.target.value)}>
               <option>Degree</option>
-              <option>Course completion</option>
-              <option>Training</option>
+              <option>Transcript</option>
+              <option>Bonafide</option>
             </SelectInput>
           </Field>
           <Field label="Credential title">

@@ -36,10 +36,13 @@ services:
 
   anvil:
     image: ghcr.io/foundry-rs/foundry:stable
+    user: "0:0"
     entrypoint: ["anvil"]
-    command: ["--host", "0.0.0.0", "--port", "8545"]
+    command: ["--host", "0.0.0.0", "--port", "8545", "--chain-id", "31337", "--state", "/data/state.json", "--state-interval", "15", "--preserve-historical-states"]
     ports:
       - "${CHAIN_PORT:-8545}:8545"
+    volumes:
+      - anvil_data:/data
 
   ocr:
     build: ./ocr-service
@@ -54,3 +57,4 @@ services:
 volumes:
   postgres_data:
   minio_data:
+  anvil_data:

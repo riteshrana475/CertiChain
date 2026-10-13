@@ -161,6 +161,8 @@ public class DemoDataSeeder implements ApplicationRunner {
             InstitutionEntity created = new InstitutionEntity();
             created.setId(UUID.fromString("00000000-0000-0000-0000-000000000001"));
             created.setName("CertiChain");
+            created.setSignatoryName("Registrar");
+            created.setSignatoryTitle("Registrar");
             return institutions.save(created);
         });
     }

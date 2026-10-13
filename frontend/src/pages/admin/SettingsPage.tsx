@@ -31,20 +31,91 @@ export function SettingsPage() {
   const [newPassword, setNewPassword] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [signatoryName, setSignatoryName] = useState("Registrar");
+  const [signatoryTitle, setSignatoryTitle] = useState("Registrar");
+  const [institutionName, setInstitutionName] = useState("");
+  const [signingKeyId, setSigningKeyId] = useState("");
+  const [signingConfigured, setSigningConfigured] = useState(false);
+  const [signingPrivate, setSigningPrivate] = useState("");
+  const [signingPublic, setSigningPublic] = useState("");
+  const [createdPrivate, setCreatedPrivate] = useState("");
 
   useEffect(() => {
     if (!issuer) return;
-    void Promise.all([api<ChainView>("/api/settings/chain"), api<Account[]>("/api/accounts")])
-      .then(([nextChain, nextAccounts]) => {
+    void Promise.all([
+      api<ChainView>("/api/settings/chain"),
+      api<Account[]>("/api/accounts"),
+      api<{ name: string; signatoryName: string; signatoryTitle: string }>("/api/settings/institution"),
+      api<{ configured: boolean; keyId: string }>("/api/settings/signing"),
+    ])
+      .then(([nextChain, nextAccounts, institution, signing]) => {
         setChain(nextChain);
         setNetwork(nextChain.chainId === 11155111 ? "sepolia" : "local");
         setRpcUrl(nextChain.rpcUrl);
         setAccounts(nextAccounts);
+        setInstitutionName(institution.name);
+        setSignatoryName(institution.signatoryName);
+        setSignatoryTitle(institution.signatoryTitle);
+        setSigningConfigured(signing.configured);
+        setSigningKeyId(signing.keyId);
       })
       .catch((caught: unknown) => {
         setError(caught instanceof Error ? caught.message : "Settings could not be loaded.");
       });
   }, [issuer]);
+
+  async function saveSigningKey(event: FormEvent) {
+    event.preventDefault();
+    setMessage("");
+    setError("");
+    try {
+      const saved = await api<{ configured: boolean; keyId: string }>("/api/settings/signing", {
+        method: "POST",
+        body: JSON.stringify({ privateKey: signingPrivate, publicKey: signingPublic }),
+      });
+      setSigningConfigured(saved.configured);
+      setSigningKeyId(saved.keyId);
+      setSigningPrivate("");
+      setSigningPublic("");
+      setCreatedPrivate("");
+      setMessage("The university signing key is saved. New credentials use it. The private key is not shown again.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The signing key could not be saved.");
+    }
+  }
+
+  async function createSigningKey() {
+    setMessage("");
+    setError("");
+    try {
+      const created = await api<{ keyId: string; publicKey: string; privateKey: string }>("/api/settings/signing/generate", { method: "POST" });
+      setSigningConfigured(true);
+      setSigningKeyId(created.keyId);
+      setCreatedPrivate(created.privateKey);
+      setSigningPrivate("");
+      setSigningPublic("");
+      setMessage("Copy the private key now. CertiChain will not show it again. Credentials already signed keep their original public key.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "A signing key could not be created.");
+    }
+  }
+
+  async function saveSignatory(event: FormEvent) {
+    event.preventDefault();
+    setMessage("");
+    setError("");
+    try {
+      const saved = await api<{ name: string; signatoryName: string; signatoryTitle: string }>("/api/settings/institution", {
+        method: "POST",
+        body: JSON.stringify({ signatoryName, signatoryTitle }),
+      });
+      setSignatoryName(saved.signatoryName);
+      setSignatoryTitle(saved.signatoryTitle);
+      setMessage("The signatory will appear on certificates issued after this save.");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The signatory could not be saved.");
+    }
+  }
 
   function useNetwork(next: "local" | "sepolia") {
     setNetwork(next);
@@ -119,6 +190,35 @@ export function SettingsPage() {
       {error ? <p className="mb-4 text-sm text-[#8c2f2f]">{error}</p> : null}
       <div className="grid gap-6 xl:grid-cols-2">
         {issuer ? (
+        <div className="space-y-6">
+        <form onSubmit={saveSignatory} className="panel space-y-4 p-5">
+          <h2 className="font-serif text-2xl">Institution</h2>
+          <p className="text-sm leading-6 text-muted">{institutionName || "This institution"} issues degree, transcript, and bonafide PDFs under this signatory. The fingerprint still uses the institution name.</p>
+          <Field label="Signatory name">
+            <TextInput value={signatoryName} onChange={(event) => setSignatoryName(event.target.value)} required />
+          </Field>
+          <Field label="Office">
+            <TextInput value={signatoryTitle} onChange={(event) => setSignatoryTitle(event.target.value)} required />
+          </Field>
+          <Button type="submit">Save signatory</Button>
+        </form>
+        <form onSubmit={saveSigningKey} className="panel space-y-4 p-5">
+          <h2 className="font-serif text-2xl">Signing key</h2>
+          <p className="text-sm leading-6 text-muted">
+            {signingConfigured ? `New credentials are signed with key ${signingKeyId}. Each credential keeps only that public key.` : "No university key is set. New credentials are not signed until you add one."}
+          </p>
+          <Field label="Private key" hint="Base64 PKCS8. Leave blank after it is saved.">
+            <TextInput type="password" autoComplete="off" value={signingPrivate} onChange={(event) => setSigningPrivate(event.target.value)} />
+          </Field>
+          <Field label="Public key" hint="Base64 X509.">
+            <TextInput value={signingPublic} onChange={(event) => setSigningPublic(event.target.value)} />
+          </Field>
+          {createdPrivate ? <p className="break-all rounded-xl bg-[#eef4f8] p-3 font-mono text-xs leading-5">{createdPrivate}</p> : null}
+          <div className="flex flex-wrap gap-3">
+            <Button type="submit">Save signing key</Button>
+            <Button type="button" variant="secondary" onClick={() => void createSigningKey()}>Create university key</Button>
+          </div>
+        </form>
         <form onSubmit={saveChain} className="panel space-y-4 p-5">
           <h2 className="font-serif text-2xl">Chain</h2>
           <p className="text-sm leading-6 text-muted">
@@ -151,6 +251,7 @@ export function SettingsPage() {
           </p>
           <Button type="submit">Save chain</Button>
         </form>
+        </div>
         ) : (
           <section className="panel space-y-3 p-5 text-sm leading-6 text-muted">
             <h2 className="font-serif text-2xl text-ink">Privacy</h2>

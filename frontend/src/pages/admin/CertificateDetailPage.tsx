@@ -169,7 +169,13 @@ export function CertificateDetailPage() {
                 </SelectInput>
               </Field>
               <Field label="Type">
-                <TextInput value={certificateType} onChange={(event) => setCertificateType(event.target.value)} required />
+                <SelectInput value={certificateType} onChange={(event) => setCertificateType(event.target.value)}>
+                  {["Degree", "Transcript", "Bonafide", certificateType]
+                    .filter((type, index, all) => type && all.indexOf(type) === index)
+                    .map((type) => (
+                      <option key={type}>{type}</option>
+                    ))}
+                </SelectInput>
               </Field>
               <Field label="Credential">
                 <TextInput value={degree} onChange={(event) => setDegree(event.target.value)} required />

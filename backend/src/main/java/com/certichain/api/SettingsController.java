@@ -1,6 +1,8 @@
 package com.certichain.api;
 
 import com.certichain.blockchain.ChainService;
+import com.certichain.institution.InstitutionEntity;
+import com.certichain.institution.InstitutionRepository;
 import com.certichain.crypto.CredentialSigner;
 import com.certichain.crypto.SigningKeyService;
 import com.certichain.security.CurrentUser;
@@ -28,6 +30,7 @@ public class SettingsController {
     private final PasswordEncoder passwordEncoder;
     private final CredentialSigner signer;
     private final SigningKeyService signingKeys;
+    private final InstitutionRepository institutions;
 
     public SettingsController(
             ChainService chain,
@@ -35,13 +38,34 @@ public class SettingsController {
             UserAccountRepository users,
             PasswordEncoder passwordEncoder,
             CredentialSigner signer,
-            SigningKeyService signingKeys) {
+            SigningKeyService signingKeys,
+            InstitutionRepository institutions) {
         this.chain = chain;
         this.current = current;
         this.users = users;
         this.passwordEncoder = passwordEncoder;
         this.signer = signer;
         this.signingKeys = signingKeys;
+        this.institutions = institutions;
+    }
+
+    @GetMapping("/api/settings/institution")
+    public InstitutionProfile institution() {
+        InstitutionEntity institution = current.institution();
+        return InstitutionProfile.from(institution);
+    }
+
+    @PostMapping("/api/settings/institution")
+    public InstitutionProfile saveInstitution(@RequestBody InstitutionProfile request) {
+        InstitutionEntity institution = current.institution();
+        String signatory = request.signatoryName() == null ? "" : request.signatoryName().trim();
+        String office = request.signatoryTitle() == null ? "" : request.signatoryTitle().trim();
+        if (signatory.isBlank() || office.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Enter the signatory name and office.");
+        }
+        institution.setSignatoryName(signatory);
+        institution.setSignatoryTitle(office);
+        return InstitutionProfile.from(institutions.save(institution));
     }
 
     @GetMapping("/api/settings/signing")
@@ -49,6 +73,23 @@ public class SettingsController {
         current.institution();
         boolean configured = signer.configured();
         return new SigningStatus(configured, configured ? signingKeys.publicKeyId() : "");
+    }
+
+    @PostMapping("/api/settings/signing")
+    public SigningStatus saveSigning(@RequestBody SigningKeyRequest request) {
+        current.institution();
+        try {
+            String keyId = signingKeys.install(request.privateKey(), request.publicKey());
+            return new SigningStatus(true, keyId);
+        } catch (IllegalArgumentException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
+        }
+    }
+
+    @PostMapping("/api/settings/signing/generate")
+    public SigningKeyService.CreatedKey generateSigning() {
+        current.institution();
+        return signingKeys.create();
     }
 
     @GetMapping("/api/settings/chain")
@@ -94,6 +135,15 @@ public class SettingsController {
     }
 
     public record SigningStatus(boolean configured, String keyId) {
+    }
+
+    public record SigningKeyRequest(String privateKey, String publicKey) {
+    }
+
+    public record InstitutionProfile(String name, String signatoryName, String signatoryTitle) {
+        static InstitutionProfile from(InstitutionEntity institution) {
+            return new InstitutionProfile(institution.getName(), institution.getSignatoryName(), institution.getSignatoryTitle());
+        }
     }
 
     public record ChainRequest(@NotBlank String rpcUrl, long chainId, String privateKey) {

@@ -2,6 +2,7 @@ package com.certichain.wallet;
 
 import com.certichain.certificate.CertificateEntity;
 import com.certichain.certificate.CertificateRepository;
+import com.certichain.document.CertificateStorage;
 import com.certichain.document.OcrClient;
 import com.certichain.institution.InstitutionRepository;
 import com.certichain.security.CurrentUser;
@@ -37,6 +38,7 @@ public class WalletService {
     private final AuditEventRepository audits;
     private final NotificationRepository notifications;
     private final UploadScanner scanner;
+    private final CertificateStorage certificatesFiles;
 
     public WalletService(
             CurrentUser current,
@@ -50,7 +52,8 @@ public class WalletService {
             OcrClient ocr,
             AuditEventRepository audits,
             NotificationRepository notifications,
-            UploadScanner scanner) {
+            UploadScanner scanner,
+            CertificateStorage certificatesFiles) {
         this.current = current;
         this.documents = documents;
         this.storage = storage;
@@ -63,6 +66,22 @@ public class WalletService {
         this.audits = audits;
         this.notifications = notifications;
         this.scanner = scanner;
+        this.certificatesFiles = certificatesFiles;
+    }
+
+    public byte[] ownCredentialPdf(String id) {
+        UserAccount user = current.requireRole("STUDENT");
+        CertificateEntity certificate = certificates.findById(id)
+                .filter(item -> !"DRAFT".equals(item.getStatus()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Credential was not found."));
+        StudentEntity student = students.findById(certificate.getStudentId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Credential was not found."));
+        if (student.getEmail() == null || !student.getEmail().equalsIgnoreCase(user.getEmail())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Credential was not found.");
+        }
+        var institution = student.getInstitutionId() == null ? null : institutions.findById(student.getInstitutionId()).orElse(null);
+        String name = institution == null ? com.certichain.crypto.CanonicalHasher.INSTITUTION : institution.getName();
+        return certificatesFiles.loadOrCreate(certificate, student, name);
     }
 
     public WalletPage library(String q, String category, String source, String sort, boolean archived, int page, int size) {

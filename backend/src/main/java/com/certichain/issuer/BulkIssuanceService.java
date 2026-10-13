@@ -204,7 +204,8 @@ public class BulkIssuanceService {
         String canonical = CanonicalHasher.canonical(id, student.getName(), certificate.getDegree(), certificate.getIssueDate().toString(), certificate.getGrade(), institution.getName());
         certificate.setDocumentHash(CanonicalHasher.sha256(canonical));
         signer.apply(certificate, CredentialSigner.payload(canonical, certificate.getDocumentHash()));
-        storage.store(certificate, CertificatePdf.render(certificate, student, institution.getName()));
+        storage.store(certificate, CertificatePdf.render(
+                certificate, student, institution.getName(), institution.getSignatoryName(), institution.getSignatoryTitle()));
         chain.sync(certificate);
         certificates.save(certificate);
         row.setCertificateId(id);

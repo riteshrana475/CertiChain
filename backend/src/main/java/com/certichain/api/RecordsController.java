@@ -16,6 +16,7 @@ import com.certichain.institution.InstitutionRepository;
 import com.certichain.security.CurrentUser;
 import com.certichain.student.StudentEntity;
 import com.certichain.student.StudentRepository;
+import com.certichain.student.StudentRoster;
 import com.certichain.user.UserAccount;
 import com.certichain.user.UserAccountRepository;
 import com.certichain.wallet.ActivityRecorder;
@@ -111,6 +112,61 @@ public class RecordsController {
         return StudentResponse.from(students.save(student));
     }
 
+    @PostMapping(value = "/api/students/import", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ImportResult importStudents(@RequestParam("file") org.springframework.web.multipart.MultipartFile file) throws java.io.IOException {
+        InstitutionEntity institution = current.institution();
+        String csv = new String(file.getBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        java.util.List<StudentRoster.Row> rows = StudentRoster.parse(csv);
+        if (rows.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The roster file is empty.");
+        }
+        if (rows.size() == 1 && !rows.get(0).error().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, rows.get(0).error());
+        }
+        int created = 0;
+        int updated = 0;
+        java.util.List<String> errors = new java.util.ArrayList<>();
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        for (StudentRoster.Row row : rows) {
+            if (!row.error().isBlank()) {
+                errors.add("Row " + row.line() + ": " + row.error());
+                continue;
+            }
+            if (row.studentNumber().isBlank() || row.name().isBlank() || row.email().isBlank() || !row.email().contains("@")
+                    || row.department().isBlank() || row.course().isBlank() || row.graduationYear() < 2000 || row.graduationYear() > 2100) {
+                errors.add("Row " + row.line() + ": each student needs a number, email, name, department, course, and a year from 2000 to 2100.");
+                continue;
+            }
+            String number = row.studentNumber().toLowerCase();
+            if (!seen.add(number)) {
+                errors.add("Row " + row.line() + ": " + row.studentNumber() + " is repeated in this file.");
+                continue;
+            }
+            StudentEntity existingEmail = students.findByEmailIgnoreCase(row.email()).orElse(null);
+            StudentEntity existingNumber = students.findByInstitutionIdAndStudentNumber(institution.getId(), row.studentNumber()).orElse(null);
+            if (existingEmail != null && (existingNumber == null || !existingEmail.getId().equals(existingNumber.getId()))) {
+                errors.add("Row " + row.line() + ": " + row.email() + " is already used by another student.");
+                continue;
+            }
+            StudentEntity student = existingNumber == null ? new StudentEntity() : existingNumber;
+            if (existingNumber == null) {
+                student.setId("stu-" + UUID.randomUUID().toString().substring(0, 8));
+                student.setInstitutionId(institution.getId());
+                created++;
+            } else {
+                updated++;
+            }
+            student.setStudentNumber(row.studentNumber().trim());
+            student.setEmail(row.email().trim());
+            student.setName(row.name().trim());
+            student.setDepartment(row.department().trim());
+            student.setCourse(row.course().trim());
+            student.setGraduationYear(row.graduationYear());
+            students.save(student);
+        }
+        return new ImportResult(created, updated, errors.size(), errors);
+    }
+
     @PutMapping("/api/students/{id}")
     public StudentResponse updateStudent(@PathVariable String id, @Valid @RequestBody StudentRequest request) {
         StudentEntity student = ownStudent(id);
@@ -182,7 +238,7 @@ public class RecordsController {
                 }
             }
             sign(certificate, student);
-            storage.store(certificate, CertificatePdf.render(certificate, student, institutionName(student)));
+            storage.store(certificate, officialPdf(certificate, student));
             chain.sync(certificate);
         } else {
             certificate.setDocumentHash("");
@@ -372,6 +428,35 @@ public class RecordsController {
         student.setDepartment(request.department().trim());
         student.setCourse(request.course().trim());
         student.setGraduationYear(request.graduationYear());
+        if (request.email() != null) {
+            String email = request.email().trim();
+            if (!email.isBlank() && !email.contains("@")) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Enter a university email address.");
+            }
+            if (!email.isBlank()) {
+                students.findByEmailIgnoreCase(email)
+                        .filter(existing -> !existing.getId().equals(student.getId()))
+                        .ifPresent(existing -> {
+                            throw new ResponseStatusException(HttpStatus.CONFLICT, "That email is already used by another student.");
+                        });
+            }
+            student.setEmail(email);
+        }
+    }
+
+    private byte[] officialPdf(CertificateEntity certificate, StudentEntity student) {
+        com.certichain.institution.InstitutionEntity institution = student.getInstitutionId() == null
+                ? null
+                : institutions.findById(student.getInstitutionId()).orElse(null);
+        if (institution == null) {
+            return CertificatePdf.render(certificate, student);
+        }
+        return CertificatePdf.render(
+                certificate,
+                student,
+                institution.getName(),
+                institution.getSignatoryName(),
+                institution.getSignatoryTitle());
     }
 
     private StudentEntity ownStudent(String id) {
@@ -418,7 +503,7 @@ public class RecordsController {
             }
         }
         sign(certificate, student);
-        storage.store(certificate, CertificatePdf.render(certificate, student, institutionName(student)));
+        storage.store(certificate, officialPdf(certificate, student));
         chain.sync(certificate);
         certificates.save(certificate);
     }
@@ -480,10 +565,14 @@ public class RecordsController {
             @NotBlank String studentNumber,
             @NotBlank String department,
             @NotBlank String course,
-            int graduationYear) {
+            int graduationYear,
+            String email) {
     }
 
-    public record StudentResponse(String id, String name, String studentNumber, String department, String course, int graduationYear) {
+    public record ImportResult(int created, int updated, int rejected, java.util.List<String> errors) {
+    }
+
+    public record StudentResponse(String id, String name, String studentNumber, String department, String course, int graduationYear, String email) {
         static StudentResponse from(StudentEntity student) {
             return new StudentResponse(
                     student.getId(),
@@ -491,7 +580,8 @@ public class RecordsController {
                     student.getStudentNumber(),
                     student.getDepartment(),
                     student.getCourse(),
-                    student.getGraduationYear());
+                    student.getGraduationYear(),
+                    student.getEmail() == null ? "" : student.getEmail());
         }
     }
 

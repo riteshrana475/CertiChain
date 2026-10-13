@@ -57,7 +57,13 @@ public class IssuedRecordPublisher implements ApplicationRunner {
                         : institutions.findById(student.getInstitutionId())
                                 .map(item -> item.getName())
                                 .orElse(CanonicalHasher.INSTITUTION);
-                changed = storage.store(certificate, CertificatePdf.render(certificate, student, institution));
+                var record = student.getInstitutionId() == null ? null : institutions.findById(student.getInstitutionId()).orElse(null);
+                changed = storage.store(certificate, CertificatePdf.render(
+                        certificate,
+                        student,
+                        institution,
+                        record == null ? "Registrar" : record.getSignatoryName(),
+                        record == null ? "Registrar" : record.getSignatoryTitle()));
             }
             changed = chain.sync(certificate) || changed;
             if (changed) {

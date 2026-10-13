@@ -28,6 +28,16 @@ public class WalletController {
         this.intelligence = intelligence;
     }
 
+    @GetMapping("/api/wallet/credentials/{id}/document")
+    public ResponseEntity<byte[]> credential(@PathVariable String id) {
+        byte[] pdf = wallet.ownCredentialPdf(id);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + id + ".pdf\"")
+                .header(HttpHeaders.CACHE_CONTROL, "private, no-store")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
+    }
+
     @GetMapping("/api/wallet/documents")
     public WalletService.WalletPage list(
             @RequestParam(defaultValue = "") String q,

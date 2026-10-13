@@ -42,9 +42,46 @@ public class SigningKeyService {
             }
             return cached;
         }
-        SigningKeyEntity saved = keys.findById(1).orElseGet(this::generate);
+        SigningKeyEntity saved = keys.findById(1).filter(SigningKeyEntity::isSupplied).orElse(null);
+        if (saved == null) {
+            log.info("No university signing key is configured. New credentials are not signed. Signatures already stored on credentials still verify.");
+            cached = new Material(false, null, "", "");
+            return cached;
+        }
         cached = decode(saved.getPrivateKey(), saved.getPublicKey());
         return cached;
+    }
+
+    public synchronized String install(String privateKey, String publicKey) {
+        Material parsed = decode(privateKey, publicKey);
+        if (!parsed.configured() || !pairMatches(parsed)) {
+            throw new IllegalArgumentException("The signing key could not be read. Paste a base64 PKCS8 private key and the matching X509 public key.");
+        }
+        SigningKeyEntity saved = keys.findById(1).orElseGet(SigningKeyEntity::new);
+        saved.setId(1);
+        saved.setPrivateKey(privateKey.trim());
+        saved.setPublicKey(parsed.publicKey());
+        saved.setKeyId(parsed.keyId());
+        saved.setSupplied(true);
+        keys.save(saved);
+        cached = parsed;
+        log.info("Stored university signing key {}. The private key is not returned by the API.", parsed.keyId());
+        return parsed.keyId();
+    }
+
+    public synchronized CreatedKey create() {
+        try {
+            KeyPairGenerator generator = KeyPairGenerator.getInstance("Ed25519");
+            KeyPair pair = generator.generateKeyPair();
+            String privateKey = Base64.getEncoder().encodeToString(pair.getPrivate().getEncoded());
+            String publicKey = Base64.getEncoder().encodeToString(pair.getPublic().getEncoded());
+            String keyId = install(privateKey, publicKey);
+            return new CreatedKey(keyId, publicKey, privateKey);
+        } catch (IllegalArgumentException exception) {
+            throw exception;
+        } catch (Exception exception) {
+            throw new IllegalStateException("A signing key could not be created.", exception);
+        }
     }
 
     public String publicKeyId() {
@@ -52,20 +89,10 @@ public class SigningKeyService {
         return material.configured() ? material.keyId() : "";
     }
 
-    private SigningKeyEntity generate() {
-        try {
-            KeyPairGenerator generator = KeyPairGenerator.getInstance("Ed25519");
-            KeyPair pair = generator.generateKeyPair();
-            SigningKeyEntity created = new SigningKeyEntity();
-            created.setId(1);
-            created.setPrivateKey(Base64.getEncoder().encodeToString(pair.getPrivate().getEncoded()));
-            created.setPublicKey(Base64.getEncoder().encodeToString(pair.getPublic().getEncoded()));
-            created.setKeyId(CanonicalHasher.sha256(pair.getPublic().getEncoded()).substring(0, 16));
-            log.info("Created a local Ed25519 signing key {} in the database. The private key is not written to source control.", created.getKeyId());
-            return keys.save(created);
-        } catch (Exception exception) {
-            throw new IllegalStateException("A signing key could not be created.", exception);
-        }
+    private static boolean pairMatches(Material material) {
+        String payload = "certichain-signing-key";
+        String signature = CredentialSigner.sign(material.privateKey(), payload);
+        return CredentialSigner.verify(payload, signature, material.publicKey());
     }
 
     private static Material decode(String privateKey, String publicKey) {
@@ -81,5 +108,8 @@ public class SigningKeyService {
     }
 
     public record Material(boolean configured, PrivateKey privateKey, String publicKey, String keyId) {
+    }
+
+    public record CreatedKey(String keyId, String publicKey, String privateKey) {
     }
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../../api/client";
+import { API_BASE, api, getToken } from "../../api/client";
 import { Button, PageHeader, StatusPill } from "../../components/ui";
 import { useRecords } from "../../state/records";
 import { categoryLabel, statusLabel, type WalletItem, type WalletPage } from "./model";
@@ -100,7 +100,27 @@ export function StudentDashboard() {
 }
 
 export function DocumentCard({ item }: { item: WalletItem }) {
+  const [error, setError] = useState("");
   const to = item.kind === "CREDENTIAL" ? `/verify/${item.id}` : `/wallet/documents/${item.id}`;
+
+  async function downloadCredential() {
+    setError("");
+    const response = await fetch(`${API_BASE}/api/wallet/credentials/${item.id}/document`, {
+      headers: { Authorization: `Bearer ${getToken() ?? ""}` },
+    });
+    if (!response.ok) {
+      setError("That credential is not issued to this account.");
+      return;
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${item.id}.pdf`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <article className="panel px-4 py-4">
       <div className="flex items-start justify-between gap-3">
@@ -111,7 +131,13 @@ export function DocumentCard({ item }: { item: WalletItem }) {
         </div>
         <StatusPill status={item.status} label={statusLabel(item.status)} />
       </div>
-      <Link to={to} className="mt-3 inline-block text-sm text-seal">Open</Link>
+      <div className="mt-3 flex gap-4">
+        <Link to={to} className="text-sm text-seal">Open</Link>
+        {item.kind === "CREDENTIAL" ? (
+          <button type="button" className="text-sm text-seal" onClick={() => void downloadCredential()}>Download</button>
+        ) : null}
+      </div>
+      {error ? <p className="mt-2 text-xs text-[#8c2f2f]">{error}</p> : null}
     </article>
   );
 }
