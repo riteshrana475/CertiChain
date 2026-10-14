@@ -310,10 +310,12 @@ public class RecordsController {
             writeLog(id, "NOT_FOUND", "DOCUMENT_CHECK");
             return new FileCheckResponse("NOT_FOUND", "", view.documentHash());
         }
-        CertificateEntity certificate = certificates.findById(id).orElseThrow();
+        CertificateEntity certificate = certificates.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No issued certificate uses this ID."));
         String fileHash = CanonicalHasher.sha256(file.getBytes());
-        boolean matches = fileHash.equals(certificate.getDocumentHash())
-                || (!certificate.getFileHash().isBlank() && fileHash.equals(certificate.getFileHash()));
+        String storedDocument = certificate.getDocumentHash() == null ? "" : certificate.getDocumentHash();
+        String storedFile = certificate.getFileHash() == null ? "" : certificate.getFileHash();
+        boolean matches = fileHash.equals(storedDocument) || (!storedFile.isBlank() && fileHash.equals(storedFile));
         String result = !matches ? "HASH_MISMATCH" : "REVOKED".equals(certificate.getStatus()) ? "REVOKED" : "VERIFIED";
         if ("HASH_MISMATCH".equals(result)) {
             StudentEntity student = students.findById(certificate.getStudentId()).orElse(null);

@@ -43,21 +43,26 @@ public class DocumentScanService {
         if (fingerprint.isBlank() && pipe != null) {
             fingerprint = CanonicalHasher.sha256(Arrays.stream(pipe).map(String::trim).reduce((left, right) -> left + "|" + right).orElse(""));
         }
+        String storedFingerprint = certificate.getDocumentHash() == null ? "" : certificate.getDocumentHash();
         String rebuilt = rebuildFingerprint(foundId, foundName, foundDegree, foundDate, foundGrade, institution);
-        if (!certificate.getDocumentHash().equalsIgnoreCase(fingerprint) && certificate.getDocumentHash().equalsIgnoreCase(rebuilt)) {
+        if (!storedFingerprint.equalsIgnoreCase(fingerprint) && storedFingerprint.equalsIgnoreCase(rebuilt)) {
             fingerprint = rebuilt;
         }
+        String issueDate = certificate.getIssueDate() == null ? "" : certificate.getIssueDate().toString();
         List<FieldComparison> fields = new ArrayList<>();
         fields.add(compareField("Certificate ID", certificate.getId(), foundId));
         fields.add(compareField("Student", student.getName(), foundName));
         fields.add(compareField("Credential", certificate.getDegree(), foundDegree));
-        fields.add(compareField("Issue date", certificate.getIssueDate().toString(), foundDate));
+        fields.add(compareField("Issue date", issueDate, foundDate));
         fields.add(compareField("Grade", certificate.getGrade(), foundGrade));
-        fields.add(compareField("Fingerprint", certificate.getDocumentHash(), fingerprint));
+        fields.add(compareField("Fingerprint", storedFingerprint, fingerprint));
         return fields;
     }
 
     private Extraction extract(byte[] fileBytes) {
+        if (fileBytes == null || fileBytes.length == 0) {
+            return new Extraction("", "The file was empty. Upload the issued PDF or the text record.");
+        }
         if (isPdf(fileBytes)) {
             return new Extraction(pdfText(fileBytes), "Text was read from the PDF. The fingerprint on the certificate stays the integrity proof.");
         }
@@ -147,8 +152,9 @@ public class DocumentScanService {
     }
 
     private static FieldComparison compareField(String field, String expected, String found) {
+        String wanted = expected == null ? "" : expected;
         String actual = found == null ? "" : found.trim();
-        return new FieldComparison(field, expected, actual, !actual.isBlank() && expected.equalsIgnoreCase(actual));
+        return new FieldComparison(field, wanted, actual, !actual.isBlank() && wanted.equalsIgnoreCase(actual));
     }
 
     public record FieldComparison(String field, String expected, String found, boolean match) {
